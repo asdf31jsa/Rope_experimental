@@ -2615,7 +2615,7 @@ class GUI(tk.Tk):
         delx, dely = 100, 120
         if self.widget['PreviewModeTextSel'].get()== 'Image':#images
             for i in range(len(images)):
-                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 86, width = 86))
+                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 190, width = 190))
 
                 rgb_video = Image.fromarray(images[i][0])
                 self.target_media.append(ImageTk.PhotoImage(image=rgb_video))
