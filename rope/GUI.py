@@ -1169,14 +1169,15 @@ class GUI(tk.Tk):
         ff_frame.grid_rowconfigure(0, weight=0)
 
         # Buttons
-        button_frame = tk.Frame(ff_frame, style.canvas_frame_label_2, height = 166, width = 112)
+        button_frame = tk.Frame(ff_frame, style.canvas_frame_label_2, height = 99, width = 224)
         button_frame.grid( row = 0, column = 0, )
 
         self.widget['FindFacesButton'] = GE.Button(button_frame, 'FindFaces', 2, self.find_faces, None, 'control', x=0, y=0, width=112, height=33)
-        self.widget['ClearFacesButton'] = GE.Button(button_frame, 'ClearFaces', 2, self.clear_faces, None, 'control', x=0, y=33, width=112, height=33)
-        self.widget['SwapFacesButton'] = GE.Button(button_frame, 'SwapFaces', 2, self.toggle_swapper, None, 'control', x=0, y=66, width=112, height=33)
-        self.widget['EditFacesButton'] = GE.Button(button_frame, 'EditFaces', 2, self.toggle_faces_editor, None, 'control', x=0, y=99, width=112, height=33)
-        self.widget['EnhanceFrameButton'] = GE.Button(button_frame, 'EnhanceFrame', 2, self.toggle_enhancer, None, 'control', x=0, y=132, width=112, height=33)
+        self.widget['ClearFacesButton'] = GE.Button(button_frame, 'ClearFaces', 2, self.clear_faces, None, 'control', x=0, y=33, width=112, height=33)        
+        self.widget['SwapFacesButton'] = GE.Button(button_frame, 'SwapFaces', 2, self.toggle_swapper, None, 'control', x=112, y=0, width=112, height=33)
+        self.widget['EditFacesButton'] = GE.Button(button_frame, 'EditFaces', 2, self.toggle_faces_editor, None, 'control', x=112, y=33, width=112, height=33)
+        self.widget['EnhanceFrameButton'] = GE.Button(button_frame, 'EnhanceFrame', 2, self.toggle_enhancer, None, 'control', x=112, y=66, width=112, height=33)
+
 
         # Scroll Canvas
         self.found_faces_canvas = tk.Canvas(ff_frame, style.canvas_frame_label_3, height = 100 )
@@ -1196,13 +1197,13 @@ class GUI(tk.Tk):
         # Buttons
         button_frame = tk.Frame(mf_frame, style.canvas_frame_label_2, height = 100, width = 112)
         button_frame.grid( row = 0, column = 0, )
-
-        self.widget['DelEmbedButton'] = GE.Button(button_frame, 'DelEmbed', 2, self.delete_merged_embedding, None, 'control', x=0, y=0, width=112, height=33)
+        
+        self.widget['DelEmbedButton'] = GE.Button(button_frame, 'DelEmbed', 2, self.delete_merged_embedding, None, 'control', x=0, y=30, width=112, height=33)        
 
         # Merged Embeddings Text
         self.merged_embedding_name = tk.StringVar()
         self.merged_embeddings_text = tk.Entry(button_frame, style.entry_2, textvariable=self.merged_embedding_name)
-        self.merged_embeddings_text.place(x=8, y=37, width = 96, height=20)
+        self.merged_embeddings_text.place(x=8, y=8, width = 96, height=20)
         self.merged_embeddings_text.bind("<Return>", lambda event: self.save_selected_source_faces(self.merged_embedding_name))
         self.me_name = self.nametowidget(self.merged_embeddings_text)
 
@@ -1420,6 +1421,8 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['RestoreEyesSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesSlider', 'Eyes Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
+        self.widget['Eyes_Mouth_BlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'Eyes_Mouth_BlurSlider', 'Eyes&Mouth Mask Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
         self.widget['RestoreEyesFeatherSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesFeatherSlider', 'Eyes Feather Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
         self.widget['RestoreEyesSizeSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesSizeSlider', 'Eyes Size Factor', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
@@ -1434,6 +1437,8 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['RestoreMouthSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthSlider', 'Mouth Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
+        self.widget['Eyes_Mouth_BlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'Eyes_Mouth_BlurSlider', 'Eyes&Mouth Mask Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1        
         self.widget['RestoreMouthFeatherSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthFeatherSlider', 'Mouth Feather Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
         self.widget['RestoreMouthSizeSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthSizeSlider', 'Mouth Size', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
@@ -1446,11 +1451,14 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['FaceParserSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'FaceParserSwitch', 'Face Parser', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
 
-        #Face Background & Neck
+        #Face Background & Blurs & Neck
+        
+        row = row + 1
+        self.widget['BGParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'BGParserBlurSlider', 'Background Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
+        row = row + 1
+        self.widget['ParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'ParserBlurSlider', 'FaceParser Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)        
         row = row + 1
         self.widget['FaceParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'FaceParserSlider', 'Background', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
-        row = row + 1
-        self.widget['BGParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'BGParserBlurSlider', 'BG Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
         row = row + 1
         self.widget['NeckParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'NeckParserSlider', 'Neck', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
 
@@ -1477,9 +1485,6 @@ class GUI(tk.Tk):
         self.widget['UpperLipParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'UpperLipParserSlider', 'Upper Lip', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
         row = row + 1
         self.widget['LowerLipParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'LowerLipParserSlider', 'Lower Lip', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
-
-        row = row + 1
-        self.widget['ParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'ParserBlurSlider', 'FaceParser Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
 
         # Autocolor
         row = row + 1
@@ -1517,6 +1522,9 @@ class GUI(tk.Tk):
         self.widget['ColorHueSlider'] = GE.Slider2(self.layer['parameters_frame'], 'ColorHueSlider', 'Hue', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
         self.widget['ColorGammaSlider'] = GE.Slider2(self.layer['parameters_frame'], 'ColorGammaSlider', 'Gamma', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['NoiseSlider'] = GE.Slider2(self.layer['parameters_frame'], 'NoiseSlider', 'Noise', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+
 
         # KPS Adjustment and scaling
         row = row + 1
@@ -2569,7 +2577,7 @@ class GUI(tk.Tk):
                     else:
                         ratio = float(image.shape[0]) / image.shape[1]
 
-                        new_height = 50
+                        new_height = 100
                         new_width = int(new_height / ratio)
                         image = cv2.resize(image, (new_width, new_height))
                         image[:new_height, :new_width, :] = image
@@ -2592,7 +2600,7 @@ class GUI(tk.Tk):
                                 video_frame = cv2.cvtColor(video_frame, cv2.COLOR_BGR2RGB)
                                 ratio = float(video_frame.shape[0]) / video_frame.shape[1]
 
-                                new_height = 50
+                                new_height = 100
                                 new_width = int(new_height / ratio)
                                 video_frame = cv2.resize(video_frame, (new_width, new_height))
                                 video_frame[:new_height, :new_width, :] = video_frame
@@ -2604,7 +2612,7 @@ class GUI(tk.Tk):
                                 print('Trouble reading file:', file)
                         else:
                             print('Trouble opening file:', file)
-        delx, dely = 100, 79
+        delx, dely = 100, 120
         if self.widget['PreviewModeTextSel'].get()== 'Image':#images
             for i in range(len(images)):
                 self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 86, width = 86))
@@ -2613,7 +2621,7 @@ class GUI(tk.Tk):
                 self.target_media.append(ImageTk.PhotoImage(image=rgb_video))
                 self.target_media_buttons[i].config( image = self.target_media[i],  command=lambda i=i: self.load_target(i, images[i][1], self.widget['PreviewModeTextSel'].get()))
                 self.target_media_buttons[i].bind("<MouseWheel>", self.target_videos_mouse_wheel)
-                self.target_media_canvas.create_window((i%2)*delx, (i//2)*dely, window = self.target_media_buttons[i], anchor='nw')
+                self.target_media_canvas.create_window(0, i*dely, window = self.target_media_buttons[i], anchor='nw')
 
             #self.target_media_canvas.configure(scrollregion = self.target_media_canvas.bbox("all"))
             self.static_widget['input_videos_scrollbar'].resize_scrollbar(None)
@@ -2621,16 +2629,16 @@ class GUI(tk.Tk):
         elif self.widget['PreviewModeTextSel'].get()=='Video':#videos
 
             for i in range(len(videos)):
-                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 65, width = 90))
+                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 115, width = 190))
                 self.target_media.append(ImageTk.PhotoImage(image=Image.fromarray(videos[i][0])))
 
                 filename = os.path.basename(videos[i][1])
-                if len(filename)>14:
-                    filename = filename[:11]+'...'
+                if len(filename)>32:
+                    filename = filename[:29]+'...'
 
                 self.target_media_buttons[i].bind("<MouseWheel>", self.target_videos_mouse_wheel)
                 self.target_media_buttons[i].config(image = self.target_media[i], text=filename, compound='top', anchor='n',command=lambda i=i: self.load_target(i, videos[i][1], self.widget['PreviewModeTextSel'].get()))
-                self.target_media_canvas.create_window((i%2)*delx, (i//2)*dely, window = self.target_media_buttons[i], anchor='nw')
+                self.target_media_canvas.create_window(0, i*dely, window = self.target_media_buttons[i], anchor='nw')
 
             self.static_widget['input_videos_scrollbar'].resize_scrollbar(None)
 
