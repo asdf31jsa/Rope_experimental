@@ -486,6 +486,12 @@ DEFAULT_DATA = {
 'RestoreEyesSizeSliderMax':                  4,
 'RestoreEyesSizeSliderMin':                  2,
 
+'Eyes_Mouth_BlurSliderAmount':               0,
+'Eyes_Mouth_BlurSliderInc':                  1,
+'Eyes_Mouth_BlurSliderInfoText':             'Eyes&Mouth Mask Blur :\nAdjust the blur of mask border',
+'Eyes_Mouth_BlurSliderMax':                  50,
+'Eyes_Mouth_BlurSliderMin':                  0,
+
 'RestoreEyesFeatherSliderAmount':               10,
 'RestoreEyesFeatherSliderInc':                  1,
 'RestoreEyesFeatherSliderInfoText':             'EYES FEATHER BLEND :\nAdjust the blending of eyes border. Increase this to show more of the original eyes. Decrease this to show more of the swapped eyes',
@@ -634,6 +640,12 @@ DEFAULT_DATA = {
 'ColorGammaSliderInfoText':               'GAMMA VALUE:\nChanges Gamma.',
 'ColorGammaSliderMax':                    2,
 'ColorGammaSliderMin':                    0,
+
+'NoiseSliderAmount':                 0,
+'NoiseSliderInc':                    0.5,
+'NoiseSliderInfoText':               'GAMMA VALUE:\nChanges Gamma.',
+'NoiseSliderMax':                    20,
+'NoiseSliderMin':                    0,
 
 'ColorBrightSliderAmount':                 1,
 'ColorBrightSliderInc':                    0.01,
