@@ -1,10 +1,14 @@
 import os
 import cv2
+import io
+import imageio
 import tkinter as tk
 from PIL import Image, ImageTk
 import threading
 import time
 import numpy as np
+import numexpr as ne
+import cupy as cp
 from skimage import transform as trans
 import subprocess
 from math import floor, ceil
@@ -847,10 +851,10 @@ class VideoManager():
             # if x is smaller, set x to 512
             if img_x <= img_y:
                 new_height = int(512*img_y/img_x)
-                tscale = v2.Resize((new_height, 512), antialias=True)
+                tscale = v2.Resize((new_height, 512), antialias=False)
             else:
                 new_height = 512
-                tscale = v2.Resize((new_height, int(512*img_x/img_y)), antialias=True)
+                tscale = v2.Resize((new_height, int(512*img_x/img_y)), antialias=False)
 
             img = tscale(img)
 
@@ -858,14 +862,14 @@ class VideoManager():
 
         elif img_x<512:
             new_height = int(512*img_y/img_x)
-            tscale = v2.Resize((new_height, 512), antialias=True)
+            tscale = v2.Resize((new_height, 512), antialias=False)
             img = tscale(img)
 
             det_scale = torch.div(new_height, img_y)
 
         elif img_y<512:
             new_height = 512
-            tscale = v2.Resize((new_height, int(512*img_x/img_y)), antialias=True)
+            tscale = v2.Resize((new_height, int(512*img_x/img_y)), antialias=False)
             img = tscale(img)
 
             det_scale = torch.div(new_height, img_y)
@@ -980,7 +984,7 @@ class VideoManager():
 
         # Unscale small videos
         if img_x <512 or img_y < 512:
-            tscale = v2.Resize((img_y, img_x), antialias=True)
+            tscale = v2.Resize((img_y, img_x), antialias=False)
             img = img.permute(2,0,1)
             img = tscale(img)
             img = img.permute(1,2,0)
@@ -1294,18 +1298,92 @@ class VideoManager():
         swap_mask = torch.ones((128, 128), dtype=torch.float32, device=device)
         swap_mask = torch.unsqueeze(swap_mask,0)
 
-        # Face Diffing
-        if parameters["DiffSwitch"]:
-            mask = self.apply_fake_diff(swap, original_face_512, parameters["DiffSlider"])
-            # mask = t128(mask)
-            gauss = transforms.GaussianBlur(parameters['BlendSlider']*2+1, (parameters['BlendSlider']+1)*0.2)
-            mask = gauss(mask.type(torch.float32))
-            swap = swap*mask + original_face_512*(1-mask)
-
         # Restorer
         if parameters["RestorerSwitch"]:
             swap = self.func_w_test('Restorer', self.apply_restorer, swap, parameters)
 
+        # Occluder
+        if parameters["OccluderSwitch"]:
+            mask = self.func_w_test('occluder', self.apply_occlusion , original_face_256, parameters["OccluderSlider"])
+            mask = t128(mask)
+            swap_mask = torch.mul(swap_mask, mask)
+            gauss = transforms.GaussianBlur(parameters['OccluderBlurSlider']*2+1, (parameters['OccluderBlurSlider']+1)*0.2)
+            swap_mask = gauss(swap_mask)            
+
+        if parameters["DFLXSegSwitch"]:
+            img_mask = self.func_w_test('occluder', self.apply_dfl_xseg , original_face_256, -parameters["DFLXSegSlider"])
+            img_mask = t128(img_mask)
+            swap_mask = torch.mul(swap_mask, 1 - img_mask)
+            gauss = transforms.GaussianBlur(parameters['OccluderBlurSlider']*2+1, (parameters['OccluderBlurSlider']+1)*0.2)
+            swap_mask = gauss(swap_mask)
+                
+        if parameters["FaceParserSwitch"]:
+            mask = self.apply_face_parser(swap, parameters)
+            mask = t128(mask)
+            swap_mask = torch.mul(swap_mask, mask)
+
+        if parameters['RestoreMouthSwitch'] or parameters['RestoreEyesSwitch']:
+            M = tform.params[0:2]
+            ones_column = np.ones((kps_5.shape[0], 1), dtype=np.float32)
+            homogeneous_kps = np.hstack([kps_5, ones_column])
+            dst_kps_5 = np.dot(homogeneous_kps, M.T)
+
+            img_swap_mask = torch.ones((1, 512, 512), dtype=torch.float32, device=device).contiguous()
+            img_orig_mask = torch.zeros((1, 512, 512), dtype=torch.float32, device=device).contiguous()
+
+            if parameters['RestoreMouthSwitch']:
+                img_swap_mask = self.restore_mouth(img_orig_mask, img_swap_mask, dst_kps_5, parameters['ParserBlurSlider'], parameters['RestoreMouthSlider']/100, parameters['RestoreMouthFeatherSlider'], parameters['RestoreMouthSizeSlider']/100, parameters['RestoreMouthRadiusFactorXSlider'], parameters['RestoreMouthRadiusFactorYSlider'])
+                img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
+
+            if parameters['RestoreEyesSwitch']:
+                img_swap_mask = self.restore_eyes(img_orig_mask, img_swap_mask, dst_kps_5, parameters['ParserBlurSlider'], parameters['RestoreEyesSlider']/100, parameters['RestoreEyesFeatherSlider'], parameters['RestoreEyesSizeSlider'],  parameters['RestoreEyesRadiusFactorXSlider'], parameters['RestoreEyesRadiusFactorYSlider'])
+                img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
+
+            img_swap_mask = t128(img_swap_mask)
+            swap_mask = torch.mul(swap_mask, img_swap_mask)
+
+        # CLIPs
+        if parameters["CLIPSwitch"]:
+            with lock:
+                mask = self.func_w_test('CLIP', self.apply_CLIPs, original_face_512, parameters["CLIPTextEntry"], parameters["CLIPSlider"])
+            mask = cv2.resize(mask, (128,128))
+            mask = torch.from_numpy(mask).to('cuda')
+            swap_mask *= mask
+            
+        # Restorer
+        if parameters["Restorer2Switch"]:
+            swap = self.func_w_test('Restorer2', self.apply_restorer2, swap, parameters)    
+          
+
+
+        if parameters["AutoColorSwitch"]:
+            # Histogram color matching original face on swapped face
+            if parameters['AutoColorTypeTextSel'] == 'Test':
+                swap = self.histogram_matching(original_face_512, swap, parameters["AutoColorSlider"])
+ 
+            elif parameters['AutoColorTypeTextSel'] == 'Test_Mask':
+                swap = self.histogram_matching_withmask(original_face_512, swap, t512(swap_mask), parameters["AutoColorSlider"])
+            
+            elif parameters['AutoColorTypeTextSel'] == 'DFL_Test':
+                swap = self.histogram_matching_DFL_test(original_face_512, swap, parameters["AutoColorSlider"])
+                    
+            elif parameters['AutoColorTypeTextSel'] == 'DFL_Orig':
+                swap = self.histogram_matching_DFL_Orig(original_face_512, swap, t512(swap_mask), parameters["AutoColorSlider"])
+ 
+            #swap = torch.clamp(swap, 0, 255)                
+
+        # Face Diffing
+        if parameters["DiffSwitch"]:
+            mask = self.apply_fake_diff(swap, original_face_512, parameters["DiffSlider"])
+            # mask = t128(mask)
+            gauss = transforms.GaussianBlur(parameters['DiffingBlurSlider']*2+1, (parameters['DiffingBlurSlider']+1)*0.2)
+            mask = gauss(mask.type(torch.float32))
+            swap = swap*mask + original_face_512*(1-mask)             
+
+        # Add blur to swap_mask results
+        #gauss = transforms.GaussianBlur(parameters['BlendSlider']*2+1, (parameters['BlendSlider']+1)*0.2)
+        #swap_mask = gauss(swap_mask)
+        
         # Apply color corerctions
         if parameters['ColorSwitch']:
             # print(parameters['ColorGammaSlider'])
@@ -1324,61 +1402,28 @@ class VideoManager():
             swap = v2.functional.adjust_saturation(swap, parameters['ColorSaturationSlider'])
             swap = v2.functional.adjust_sharpness(swap, parameters['ColorSharpnessSlider'])
             swap = v2.functional.adjust_hue(swap, parameters['ColorHueSlider'])
+        
+        if parameters['FinalBlurSlider'] > 0:
+            final_blur_strength = parameters["FinalBlurSlider"]  # Ein Parameter steuert beides
+            # Bestimme kernel_size und sigma basierend auf dem Parameter
+            kernel_size = 2 * final_blur_strength + 1  # Ungerade Zahl, z.B. 3, 5, 7, ...
+            sigma = final_blur_strength * 0.3  # Sigma proportional zur Stärke
+            # Gaussian Blur anwenden
+            gaussian_blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+            swap = gaussian_blur(swap)   
 
-        # Occluder
-        if parameters["OccluderSwitch"]:
-            mask = self.func_w_test('occluder', self.apply_occlusion , original_face_256, parameters["OccluderSlider"])
-            mask = t128(mask)
-            swap_mask = torch.mul(swap_mask, mask)
-
-        if parameters["DFLXSegSwitch"]:
-            img_mask = self.func_w_test('occluder', self.apply_dfl_xseg , original_face_256, -parameters["DFLXSegSlider"])
-            img_mask = t128(img_mask)
-            swap_mask = torch.mul(swap_mask, 1 - img_mask)
-
-        if parameters["FaceParserSwitch"]:
-            mask = self.apply_face_parser(swap, parameters)
-            mask = t128(mask)
-            swap_mask = torch.mul(swap_mask, mask)
-
-        if parameters['RestoreMouthSwitch'] or parameters['RestoreEyesSwitch']:
-            M = tform.params[0:2]
-            ones_column = np.ones((kps_5.shape[0], 1), dtype=np.float32)
-            homogeneous_kps = np.hstack([kps_5, ones_column])
-            dst_kps_5 = np.dot(homogeneous_kps, M.T)
-
-            img_swap_mask = torch.ones((1, 512, 512), dtype=torch.float32, device=device).contiguous()
-            img_orig_mask = torch.zeros((1, 512, 512), dtype=torch.float32, device=device).contiguous()
-
-            if parameters['RestoreMouthSwitch']:
-                img_swap_mask = self.restore_mouth(img_orig_mask, img_swap_mask, dst_kps_5, parameters['RestoreMouthSlider']/100, parameters['RestoreMouthFeatherSlider'], parameters['RestoreMouthSizeSlider']/100, parameters['RestoreMouthRadiusFactorXSlider'], parameters['RestoreMouthRadiusFactorYSlider'])
-                img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
-
-            if parameters['RestoreEyesSwitch']:
-                img_swap_mask = self.restore_eyes(img_orig_mask, img_swap_mask, dst_kps_5,  parameters['RestoreEyesSlider']/100, parameters['RestoreEyesFeatherSlider'], parameters['RestoreEyesSizeSlider'],  parameters['RestoreEyesRadiusFactorXSlider'], parameters['RestoreEyesRadiusFactorYSlider'])
-                img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
-
-            img_swap_mask = t128(img_swap_mask)
-            swap_mask = torch.mul(swap_mask, img_swap_mask)
-
-        # CLIPs
-        if parameters["CLIPSwitch"]:
-            with lock:
-                mask = self.func_w_test('CLIP', self.apply_CLIPs, original_face_512, parameters["CLIPTextEntry"], parameters["CLIPSlider"])
-            mask = cv2.resize(mask, (128,128))
-            mask = torch.from_numpy(mask).to('cuda')
-            swap_mask *= mask
-
-        # Add blur to swap_mask results
-        gauss = transforms.GaussianBlur(parameters['BlendSlider']*2+1, (parameters['BlendSlider']+1)*0.2)
-        swap_mask = gauss(swap_mask)
+        if parameters['JpegCompressionSwitch']:   
+        #if parameters["DiffSlider"] > 0:
+            swap = self.jpegBlur(swap, parameters["JpegCompressionSlider"])
+            #swap = swap#.type(torch.float32)  
+            swap = torch.clamp(swap, 0, 255)             
 
         # Combine border and swap mask, scale, and apply to swap
         swap_mask = torch.mul(swap_mask, border_mask)
         swap_mask = t512(swap_mask)
         swap = torch.mul(swap, swap_mask)
 
-        if not control['MaskViewButton']:
+        if not control['MaskViewButton'] and not control['CompareViewButton']:
             # Cslculate the area to be mergerd back to the original frame
             IM512 = tform.inverse.params[0:2, :]
             corners = np.array([[0,0], [0,511], [511, 0], [511, 511]])
@@ -1423,7 +1468,7 @@ class VideoManager():
             swap = swap.permute(2,0,1)
             img[0:3, top:bottom, left:right] = swap
 
-        else:
+        elif control['MaskViewButton']:
             # Invert swap mask
             swap_mask = torch.sub(1, swap_mask)
 
@@ -1441,8 +1486,232 @@ class VideoManager():
             # Place them side by side
             img = torch.hstack([original_face_512, swap_mask*255])
             img = img.permute(2,0,1)
+            
+        else:
+            # Invert swap mask
+            swap_mask = torch.sub(1, swap_mask)
+            
+            # Combine preswapped face with swap and prepare original face
+            original_face2 = original_face_512.clone()
+            original_face_512 = torch.mul(swap_mask, original_face_512)
+            original_face_512 = torch.add(swap, original_face_512)            
+            original_face_512 = original_face_512.type(torch.uint8)
+            original_face_512 = original_face_512.permute(1, 2, 0)
+            original_face2 = original_face2.type(torch.uint8)
+            original_face2 = original_face2.permute(1, 2, 0)            
+
+            # Place them side by side
+            img = torch.hstack([original_face_512, original_face2])
+            img = img.permute(2,0,1)  
 
         return img
+
+    def jpegBlur(self, image, q):
+        # Konvertiere Torch-Tensor in CuPy-Array und transponiere zu (512, 512, 3)
+        im_cp = cp.asarray(image.permute(1, 2, 0).contiguous().cpu().numpy().astype('uint8'))
+        
+        # Konvertiere zu uint8, falls noch nicht geschehen
+        #im_cp_uint8 = im_cp.astype(cp.uint8)
+        
+        # Schreibe in einen Puffer als JPEG mit gegebener Qualität
+        buf = io.BytesIO()
+        imageio.imwrite(buf, cp.asnumpy(im_cp), format='jpeg', quality=q)
+        
+        # Lese das Bild aus dem Puffer
+        buf.seek(0)
+        im_cp_blurred = cp.asarray(imageio.imread(buf, format='jpeg')).astype(cp.float32)
+        
+        # Transponiere zurück zu (3, 512, 512)
+        im_cp_blurred = im_cp_blurred.transpose(2, 0, 1)
+        
+        # Konvertiere das CuPy-Array zurück zu einem Torch-Tensor und auf die GPU
+        im_blurred = torch.from_numpy(cp.asnumpy(im_cp_blurred)).to('cuda')
+        
+        return im_blurred          
+
+    def histogram_matching(self, source_image, target_image, diffslider):
+        # convert to CuPy
+        source_image_cp = cp.asarray(source_image.permute(1, 2, 0).contiguous().detach().to('cpu').numpy().astype('float32'))
+        target_image_cp = cp.asarray(target_image.permute(1, 2, 0).contiguous().detach().to('cpu').numpy().astype('float32'))
+
+        # normalize images [0, 1]
+        source_image_cp /= 255.0
+        target_image_cp /= 255.0
+
+        matched_target_image_cp = cp.copy(target_image_cp)
+
+        for channel in range(3):
+            # Calculate the histograms and cumulative distributions
+            source_hist, bin_edges = cp.histogram(source_image_cp[:, :, channel], bins=256, range=(0, 1), density=True)
+            target_hist, _ = cp.histogram(target_image_cp[:, :, channel], bins=256, range=(0, 1), density=True)
+
+            source_cdf = cp.cumsum(source_hist)
+            target_cdf = cp.cumsum(target_hist)
+
+            # Normalize the CDFs
+            source_cdf /= source_cdf[-1]
+            target_cdf /= target_cdf[-1]
+
+            # Create a mapping function from target CDF to source CDF
+            interp_t_values = cp.interp(target_image_cp[:, :, channel].flatten(), bin_edges[:-1], target_cdf)
+            matched_channel = cp.interp(interp_t_values, source_cdf, bin_edges[:-1])
+
+            matched_target_image_cp[:, :, channel] = matched_channel.reshape(target_image_cp[:, :, channel].shape)
+
+        final_image_cp = (1 - diffslider/100) * target_image_cp + diffslider/100 * matched_target_image_cp
+
+        final_image_cp = cp.clip(final_image_cp * 255, 0, 255)#.astype(cp.uint8)
+
+        # Convert the result back to a Torch tensor and onto the original device
+        final_image_tensor = torch.from_numpy(cp.asnumpy(final_image_cp.transpose(2, 0, 1))).float().to(source_image.device)
+
+        return final_image_tensor  
+             
+
+    def histogram_matching_withmask(self, source_image, target_image, mask, diffslider):
+        # Convert Torch tensors into NumPy arrays and ensure they are on the CPU
+        source_image_np = source_image.permute(1, 2, 0).contiguous().detach().cpu().numpy().astype('float32')
+        target_image_np = target_image.permute(1, 2, 0).contiguous().detach().cpu().numpy().astype('float32')
+        mask_np = mask.squeeze().contiguous().detach().cpu().numpy().astype('float32')
+
+        # Normalize the images to the range [0, 1]
+        source_image_np /= 255.0
+        target_image_np /= 255.0
+
+        # Apply histogram matching only to the masked areas
+        matched_target_image_np = np.copy(target_image_np)
+
+        # Define the condition for the mask
+        valid_mask = mask_np > 0.2
+
+        for channel in range(3):
+            # Perform calculations only on the valid (non-masked) areas
+            masked_source_values = source_image_np[:, :, channel][valid_mask]
+            masked_target_values = target_image_np[:, :, channel][valid_mask]
+
+            # Calculate the histograms and cumulative distributions only for the valid areas
+            source_hist, bin_edges = np.histogram(masked_source_values, bins=256, range=(0, 1), density=True)
+            target_hist, _ = np.histogram(masked_target_values, bins=256, range=(0, 1), density=True)
+
+            source_cdf = np.cumsum(source_hist)
+            target_cdf = np.cumsum(target_hist)
+
+            # Normalize the CDFs
+            source_cdf /= source_cdf[-1]
+            target_cdf /= target_cdf[-1]
+
+            # Create a mapping function from target CDF to source CDF
+            interp_t_values = np.interp(target_image_np[:, :, channel].flatten(), bin_edges[:-1], target_cdf)
+            matched_channel = np.interp(interp_t_values, source_cdf, bin_edges[:-1])
+
+            # Apply the mapping only to the valid areas
+            matched_channel_reshaped = matched_channel.reshape(target_image_np[:, :, channel].shape)
+            matched_target_image_np[:, :, channel][valid_mask] = matched_channel_reshaped[valid_mask]
+
+        # Interpolate the result depending on the diffslider
+        final_image_np = (1 - diffslider / 100) * target_image_np + (diffslider / 100) * matched_target_image_np
+
+        # Convert back to uint8
+        final_image_np = np.clip(final_image_np * 255, 0, 255)
+
+        # Convert the result back into a Torch tensor and onto the original device
+        final_image_tensor = torch.from_numpy(final_image_np.transpose(2, 0, 1)).float().to(source_image.device)
+
+        return final_image_tensor 
+
+    def histogram_matching_DFL_test(self, source_image, target_image, diffslider):
+        # Convert Torch tensors into CuPy arrays and ensure they are on the GPU
+        source_image_np = source_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
+        target_image_np = target_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
+        # normalize images [0, 1]
+        source_image_np /= 255.0
+        target_image_np /= 255.0
+
+        source = cv2.cvtColor(source_image_np, cv2.COLOR_BGR2LAB)
+        target = cv2.cvtColor(target_image_np, cv2.COLOR_BGR2LAB)
+
+        target_l_mean, target_l_std, target_a_mean, target_a_std, target_b_mean, target_b_std, \
+            = target[...,0].mean(), target[...,0].std(), target[...,1].mean(), target[...,1].std(), target[...,2].mean(), target[...,2].std()
+        
+        source_l_mean, source_l_std, source_a_mean, source_a_std, source_b_mean, source_b_std, \
+            = source[...,0].mean(), source[...,0].std(), source[...,1].mean(), source[...,1].std(), source[...,2].mean(), source[...,2].std()       
+        
+        # not as in the paper: scale by the standard deviations using reciprocal of paper proposed factor
+        target_l = target[...,0]
+        target_l = ne.evaluate('(target_l - target_l_mean) * source_l_std / target_l_std + source_l_mean')
+
+        target_a = target[...,1]
+        target_a = ne.evaluate('(target_a - target_a_mean) * source_a_std / target_a_std + source_a_mean')
+        
+        target_b = target[...,2]
+        target_b = ne.evaluate('(target_b - target_b_mean) * source_b_std / target_b_std + source_b_mean')
+        
+        np.clip(target_l,    0, 100, out=target_l)
+        np.clip(target_a, -127, 127, out=target_a)
+        np.clip(target_b, -127, 127, out=target_b)
+        
+        matched_target_image_np = cv2.cvtColor(np.stack([target_l,target_a,target_b], -1), cv2.COLOR_LAB2BGR)
+        final_image_np = (1 - diffslider/100) * target_image_np + diffslider/100 * matched_target_image_np
+        final_image_np = np.clip(final_image_np * 255, 0, 255)#.astype(np.uint8)        
+        final_image_tensor = torch.from_numpy(final_image_np.transpose(2, 0, 1)).float().to(source_image.device)
+
+        return final_image_tensor        
+        
+    def histogram_matching_DFL_Orig(self, source_image, target_image, mask, diffslider):        
+        # Convert Torch tensors into CuPy arrays and ensure they are on the GPU
+        source_image_np = source_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
+        target_image_np = target_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
+        mask_np = mask.cpu().numpy().astype('float32').transpose(1, 2, 0) 
+        mask_cutoff = 0.2
+
+        source_mask = mask_np
+        target_mask = mask_np        
+        
+        # normalize images [0, 1]
+        source_image_np /= 255.0
+        target_image_np /= 255.0
+
+        source = cv2.cvtColor(source_image_np, cv2.COLOR_BGR2LAB)
+        target = cv2.cvtColor(target_image_np, cv2.COLOR_BGR2LAB)
+
+        source_input = source
+        if source_mask is not None:
+            source_input = source_input.copy()
+            source_input[source_mask[...,0] < mask_cutoff] = [0,0,0]
+        
+        target_input = target
+        if target_mask is not None:
+            target_input = target_input.copy()
+            target_input[target_mask[...,0] < mask_cutoff] = [0,0,0]
+            
+
+        target_l_mean, target_l_std, target_a_mean, target_a_std, target_b_mean, target_b_std, \
+            = target_input[...,0].mean(), target_input[...,0].std(), target_input[...,1].mean(), target_input[...,1].std(), target_input[...,2].mean(), target_input[...,2].std()
+        
+        source_l_mean, source_l_std, source_a_mean, source_a_std, source_b_mean, source_b_std, \
+            = source_input[...,0].mean(), source_input[...,0].std(), source_input[...,1].mean(), source_input[...,1].std(), source_input[...,2].mean(), source_input[...,2].std()       
+        
+        # not as in the paper: scale by the standard deviations using reciprocal of paper proposed factor
+        target_l = target[...,0]
+        target_l = ne.evaluate('(target_l - target_l_mean) * source_l_std / target_l_std + source_l_mean')
+
+        target_a = target[...,1]
+        target_a = ne.evaluate('(target_a - target_a_mean) * source_a_std / target_a_std + source_a_mean')
+        
+        target_b = target[...,2]
+        target_b = ne.evaluate('(target_b - target_b_mean) * source_b_std / target_b_std + source_b_mean')      
+
+        np.clip(target_l,    0, 100, out=target_l)
+        np.clip(target_a, -127, 127, out=target_a)
+        np.clip(target_b, -127, 127, out=target_b)
+        
+        matched_target_image_np = cv2.cvtColor(np.stack([target_l,target_a,target_b], -1), cv2.COLOR_LAB2BGR)
+        final_image_np = (1 - diffslider/100) * target_image_np + diffslider/100 * matched_target_image_np
+        final_image_np = np.clip(final_image_np * 255, 0, 255)#.astype(np.uint8)
+        
+        final_image_tensor = torch.from_numpy(final_image_np.transpose(2, 0, 1)).float().to(source_image.device)
+ 
+        return final_image_tensor        
 
     def swap_edit_face_core(self, img, kps, parameters, parameters_face_editor, control, **kwargs): # img = RGB
         # Scaling Transforms
@@ -1543,7 +1812,7 @@ class VideoManager():
 
             flag_do_crop_input_retargeting_image = kwargs.get('flag_do_crop_input_retargeting_image', True)
             if flag_do_crop_input_retargeting_image:
-                gauss = transforms.GaussianBlur(parameters['BlendSlider']*2+1, (parameters['BlendSlider']+1)*0.2)
+                gauss = transforms.GaussianBlur(parameters['DFLXSegSlider']*2+1, (parameters['DFLXSegSlider']+1)*0.2)
                 mask_ori = gauss(mask_ori)
                 img = faceutil.paste_back(out, M_c2o, img, mask_ori)
             else:
@@ -1703,6 +1972,8 @@ class VideoManager():
                 attribute_parse = torch.neg(attribute_parse)
                 attribute_parse = torch.add(attribute_parse, 1)
                 attribute_parse = torch.reshape(attribute_parse, (1, 512, 512))
+                gauss = transforms.GaussianBlur(parameters['ParserBlurSlider']*2+1, (parameters['ParserBlurSlider']+1)*0.2)
+                attribute_parse = gauss(attribute_parse)
             else:
                 attribute_parse = torch.ones((1, 512, 512), dtype=torch.float32, device='cuda')
             face_parses.append(attribute_parse)
@@ -1719,7 +1990,8 @@ class VideoManager():
             for i in range(int(FaceAmount)):
                 bg_parse = torch.nn.functional.conv2d(bg_parse, kernel, padding=(1, 1))
                 bg_parse = torch.clamp(bg_parse, 0, 1)
-
+            gauss = transforms.GaussianBlur(parameters['BGParserBlurSlider']*2+1, (parameters['BGParserBlurSlider']+1)*0.2)
+            bg_parse = gauss(bg_parse)
             bg_parse = torch.squeeze(bg_parse)
 
         elif FaceAmount < 0:
@@ -1736,6 +2008,8 @@ class VideoManager():
             bg_parse = torch.neg(bg_parse)
             bg_parse = torch.add(bg_parse, 1)
             bg_parse = torch.reshape(bg_parse, (1, 512, 512))
+            gauss = transforms.GaussianBlur(parameters['BGParserBlurSlider']*2+1, (parameters['BGParserBlurSlider']+1)*0.2)
+            bg_parse = gauss(bg_parse)
         else:
             bg_parse = torch.ones((1,512,512), dtype=torch.float32, device='cuda')
 
@@ -1788,7 +2062,7 @@ class VideoManager():
             self.models.run_GFPGAN(temp, outpred)
 
         elif parameters['RestorerTypeTextSel'] == 'CodeFormer':
-            self.models.run_codeformer(temp, outpred)
+            self.models.run_codeformer(temp, outpred, parameters['VQFRFidelitySlider'])
 
         elif parameters['RestorerTypeTextSel'] == 'GPEN-256':
             outpred = torch.empty((1,3,256,256), dtype=torch.float32, device=device).contiguous()
@@ -1832,6 +2106,94 @@ class VideoManager():
         outpred = torch.add(torch.mul(outpred, alpha), torch.mul(swapped_face_upscaled, 1-alpha))
 
         return outpred
+        
+    def apply_restorer2(self, swapped_face_upscaled, parameters):
+        temp = swapped_face_upscaled
+        t512 = v2.Resize((512, 512), antialias=False)
+        t256 = v2.Resize((256, 256), antialias=False)
+        t1024 = v2.Resize((1024, 1024), antialias=False)
+        t2048 = v2.Resize((2048, 2048), antialias=False)
+
+        # If using a separate detection mode
+        if parameters['Restorer2DetTypeTextSel'] == 'Blend' or parameters['Restorer2DetTypeTextSel'] == 'Reference':
+            if parameters['Restorer2DetTypeTextSel'] == 'Blend':
+                # Set up Transformation
+                dst = self.arcface_dst * 4.0
+                dst[:,0] += 32.0
+
+            elif parameters['Restorer2DetTypeTextSel'] == 'Reference':
+                try:
+                    dst = self.models.resnet50(swapped_face_upscaled, score=parameters['DetectScoreSlider']/100.0)
+                except Exception as e:
+                    print(f"exception: {e}")
+                    return swapped_face_upscaled
+
+            tform = trans.SimilarityTransform()
+            tform.estimate(dst, self.FFHQ_kps)
+
+            # Transform, scale, and normalize
+            temp = v2.functional.affine(swapped_face_upscaled, tform.rotation*57.2958, (tform.translation[0], tform.translation[1]) , tform.scale, 0, center = (0,0) )
+            temp = v2.functional.crop(temp, 0,0, 512, 512)
+
+        temp = torch.div(temp, 255)
+        temp = v2.functional.normalize(temp, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=False)
+
+        if parameters['Restorer2TypeTextSel'] == 'GPEN-256':
+            temp = t256(temp)
+
+        temp = torch.unsqueeze(temp, 0).contiguous()
+
+        # Bindings
+        outpred = torch.empty((1,3,512,512), dtype=torch.float32, device=device).contiguous()
+
+        if parameters['Restorer2TypeTextSel'] == 'GFPGAN-v1.4':
+            self.models.run_GFPGAN(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'CodeFormer':
+            self.models.run_codeformer(temp, outpred, parameters['VQFRFidelitySlider'])
+
+        elif parameters['Restorer2TypeTextSel'] == 'GPEN-256':
+            outpred = torch.empty((1,3,256,256), dtype=torch.float32, device=device).contiguous()
+            self.models.run_GPEN_256(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'GPEN-512':
+            self.models.run_GPEN_512(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'GPEN-1024':
+            temp = t1024(temp)
+            outpred = torch.empty((1, 3, 1024, 1024), dtype=torch.float32, device=device).contiguous()
+            self.models.run_GPEN_1024(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'GPEN-2048':
+            temp = t2048(temp)
+            outpred = torch.empty((1, 3, 2048, 2048), dtype=torch.float32, device=device).contiguous()
+            self.models.run_GPEN_2048(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'RestoreFormer++':
+            self.models.run_RestoreFormerPlusPlus(temp, outpred)
+
+        elif parameters['Restorer2TypeTextSel'] == 'VQFR-v2':
+            self.models.run_VQFR_v2(temp, outpred, parameters['VQFRFidelitySlider'])
+
+        # Format back to cxHxW @ 255
+        outpred = torch.squeeze(outpred)
+        outpred = torch.clamp(outpred, -1, 1)
+        outpred = torch.add(outpred, 1)
+        outpred = torch.div(outpred, 2)
+        outpred = torch.mul(outpred, 255)
+
+        if parameters['Restorer2TypeTextSel'] == 'GPEN-256' or parameters['Restorer2TypeTextSel'] == 'GPEN-1024' or parameters['Restorer2TypeTextSel'] == 'GPEN-2048':
+            outpred = t512(outpred)
+
+        # Invert Transform
+        if parameters['Restorer2DetTypeTextSel'] == 'Blend' or parameters['Restorer2DetTypeTextSel'] == 'Reference':
+            outpred = v2.functional.affine(outpred, tform.inverse.rotation*57.2958, (tform.inverse.translation[0], tform.inverse.translation[1]), tform.inverse.scale, 0, interpolation=v2.InterpolationMode.BILINEAR, center = (0,0) )
+
+        # Blend
+        alpha = float(parameters["Restorer2Slider"])/100.0
+        outpred = torch.add(torch.mul(outpred, alpha), torch.mul(swapped_face_upscaled, 1-alpha))
+
+        return outpred        
 
     def apply_fake_diff(self, swapped_face, original_face, DiffAmount):
         swapped_face = swapped_face.permute(1,2,0)
@@ -1885,7 +2247,7 @@ class VideoManager():
 
         return mask
 
-    def restore_mouth(self, img_orig, img_swap, kpss_orig, blend_alpha=0.5, feather_radius=10, size_factor=0.5, radius_factor_x=1.0, radius_factor_y=1.0):
+    def restore_mouth(self, img_orig, img_swap, kpss_orig, ParserBlurSlider, blend_alpha=0.5, feather_radius=10, size_factor=0.5, radius_factor_x=1.0, radius_factor_y=1.0):
         """
         Extract mouth from img_orig using the provided keypoints and place it in img_swap.
 
@@ -1927,11 +2289,21 @@ class VideoManager():
 
         img_swap_mouth = img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax]
         blended_mouth = blend_alpha * img_swap_mouth + (1 - blend_alpha) * mouth_region_orig
+        
+        # Schritt 1: Maske in 3D-Form bringen (1, 44, 60), indem eine Kanal-Dimension hinzugefügt wird
+        #mask_3d = mouth_mask.unsqueeze(0)  # Fügt die Kanal-Dimension hinzu, jetzt (1, 44, 60)
+
+        # Schritt 2: Gaussian Blur anwenden
+        # kernel_size muss eine ungerade Zahl sein (z.B. 5), sigma ist der Standardabweichungswert
+        #gauss = transforms.GaussianBlur(ParserBlurSlider*2+1, (ParserBlurSlider+1)*0.2)
+        #mouth_mask = gauss(mask_3d)
+        # Schritt 3: Zurück zur 2D-Form (44, 60), indem die Kanal-Dimension entfernt wird
+        #mouth_mask = mouth_mask.squeeze(0)  # Entfernt die Kanal-Dimension
 
         img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax] = mouth_mask * blended_mouth + (1 - mouth_mask) * img_swap_mouth
         return img_swap
 
-    def restore_eyes(self, img_orig, img_swap, kpss_orig, blend_alpha=0.5, feather_radius=10, size_factor=3.5, radius_factor_x=1.0, radius_factor_y=1.0):
+    def restore_eyes(self, img_orig, img_swap, kpss_orig, ParserBlurSlider, blend_alpha=0.5, feather_radius=10, size_factor=3.5, radius_factor_x=1.0, radius_factor_y=1.0):
         """
         Extract eyes from img_orig using the provided keypoints and place them in img_swap.
 
@@ -1974,7 +2346,18 @@ class VideoManager():
 
             img_swap_eye = img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax]
             blended_eye = blend_alpha * img_swap_eye + (1 - blend_alpha) * eye_region_orig
+            
+            # Schritt 1: Maske in 3D-Form bringen (1, 44, 60), indem eine Kanal-Dimension hinzugefügt wird
+            #mask_3d = eye_mask.unsqueeze(0)  # Fügt die Kanal-Dimension hinzu, jetzt (1, 44, 60)
 
+            # Schritt 2: Gaussian Blur anwenden
+            # kernel_size muss eine ungerade Zahl sein (z.B. 5), sigma ist der Standardabweichungswert
+            #gauss = transforms.GaussianBlur(ParserBlurSlider*2+1, (ParserBlurSlider+1)*0.2)
+            #eye_mask = gauss(mask_3d)
+            # Schritt 3: Zurück zur 2D-Form (44, 60), indem die Kanal-Dimension entfernt wird
+            #eye_mask = eye_mask.squeeze(0)  # Entfernt die Kanal-Dimension
+
+                
             img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax] = eye_mask * blended_eye + (1 - eye_mask) * img_swap_eye
 
         # Process both eyes
