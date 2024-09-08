@@ -1,3 +1,18 @@
+added:
+- "show compare". like "show mask", but with original face instead of the mask. 
+- second restorer with seperate parameters
+- Final Face Blurring (at end of pipeline), so you can "over restore" and blur it afterwards.
+- color transfer from target face to swapped face (4 experimantel versions for testing)
+- seperate Blend sliders for mask manipulation + diffing (Occlusion/Xseg Blur, Faceparser Blur, Background Facceparser Blur, Face Diffing Blur)
+- Jpeg Compression effect for faces (for low quality targets. and topaz likes it in my experience)
+
+pip install:
+cupy
+io
+imageio
+
+-----------------------------------------
+
 ![image](https://github.com/Alucard24/Rope/releases/download/splash/splash_next.png)
 
 Next-0.8.23
