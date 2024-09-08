@@ -10,6 +10,7 @@ pip install:
 cupy
 io
 imageio
+
 -----------------------------------------
 
 ![image](https://github.com/Alucard24/Rope/releases/download/splash/splash_next.png)
