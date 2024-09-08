@@ -1436,8 +1436,6 @@ class GUI(tk.Tk):
         self.widget['RestoreMouthSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'RestoreMouthSwitch', 'Restore Mouth', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
         row = row + 1
         self.widget['RestoreMouthSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthSlider', 'Mouth Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
-        row = row + 1
-        self.widget['Eyes_Mouth_BlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'Eyes_Mouth_BlurSlider', 'Eyes&Mouth Mask Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1        
         self.widget['RestoreMouthFeatherSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthFeatherSlider', 'Mouth Feather Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
