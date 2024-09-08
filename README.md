@@ -7,8 +7,9 @@ added:
 - Jpeg Compression effect for faces (for low quality targets. and topaz likes it in my experience)
 
 pip install:
-cupy (when on cuda12), or cupy-cuda11x (when on cuda11)
-imageio
+- cupy (when on cuda12), or cupy-cuda11x (when on cuda11)
+- imageio
+
 
 -----------------------------------------
 
