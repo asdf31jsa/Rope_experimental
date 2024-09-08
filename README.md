@@ -1,4 +1,10 @@
-added:
+8.9.24 added:
+- added eye/mouth mask blur slider for the edges of the mask (for "Restore Eyes" and "Restore Mouth")
+- added noise slider for face (active when "Color Adjustment" is activated)
+- 1 input file per row instead of 2. increased size of input thumbnails and longer filenames. 
+- reduced hight of found faces area, so preview gets bigger
+  
+7.9.24 added:
 - "show compare". like "show mask", but with original face instead of the mask. 
 - second restorer with seperate parameters
 - Final Face Blurring (at end of pipeline), so you can "over restore" and blur it afterwards.
