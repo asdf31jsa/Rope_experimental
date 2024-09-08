@@ -355,6 +355,7 @@ class GUI(tk.Tk):
                     "Previous Marker": "q",
                     "Next Marker": "w",
                     "Toggle Restorer": "1",
+                    "Toggle Restorer2": "h",                    
                     "Toggle Orientation": "2",
                     "Toggle Strength": "3",
                     "Toggle Differencing": "4",
@@ -389,6 +390,7 @@ class GUI(tk.Tk):
             shortcuts["Previous Marker"]: lambda: self.update_marker('prev'),
             shortcuts["Next Marker"]: lambda: self.update_marker('next'),
             shortcuts["Toggle Restorer"]: lambda: self.toggle_and_update('Restorer', 'Restorer'),
+            #shortcuts["Toggle Restorer2"]: lambda: self.toggle_and_update('Restorer2', 'Restorer2'),
             shortcuts["Toggle Orientation"]: lambda: self.toggle_and_update('Orient', 'Orientation'),
             shortcuts["Toggle Strength"]: lambda: self.toggle_and_update('Strength', 'Strength'),
             shortcuts["Toggle Differencing"]: lambda: self.toggle_and_update('Diff', 'Differencing'),
@@ -580,6 +582,7 @@ class GUI(tk.Tk):
                     "Previous Marker": "q",
                     "Next Marker": "w",
                     "Toggle Restorer": "1",
+                    "Toggle Restorer2": "h",
                     "Toggle Orientation": "2",
                     "Toggle Strength": "3",
                     "Toggle Differencing": "4",
@@ -1071,8 +1074,12 @@ class GUI(tk.Tk):
         frame.grid(row=0, column=1)
         self.widget['MaskViewButton'] = GE.Button(frame, 'MaskView', 2, self.toggle_maskview, None, 'control', x=0, y=0, width=100)
 
-        frame = tk.Frame(preview_data, style.canvas_frame_label_2, height = 24, width=200)
+        frame = tk.Frame(preview_data, style.canvas_frame_label_2, height = 24, width=100)
         frame.grid(row=0, column=2)
+        self.widget['CompareViewButton'] = GE.Button(frame, 'CompareView', 2, self.toggle_compareview, None, 'control', x=0, y=0, width=100)
+
+        frame = tk.Frame(preview_data, style.canvas_frame_label_2, height = 24, width=200)
+        frame.grid(row=0, column=3)
         self.widget['PreviewModeTextSel'] = GE.TextSelection(frame, 'PreviewModeTextSel', '', 2, self.set_view, True, 'control', width=200, height=20, row=0, column=0, padx=1, pady=0, text_percent=1)
 
       # Preview Window
@@ -1321,6 +1328,16 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['RestorerSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestorerSlider', 'Restorer Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.72)
 
+        # Restore2
+        row = row + 1
+        self.widget['Restorer2Switch'] = GE.Switch2(self.layer['parameters_frame'], 'Restorer2Switch', '2. Restorer', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
+        row = row + 1
+        self.widget['Restorer2TypeTextSel'] = GE.TextSelectionComboBox(self.layer['parameters_frame'], 'Restorer2TypeTextSel', '2. Restorer Type', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72, 150)
+        row = row + 1
+        self.widget['Restorer2DetTypeTextSel'] = GE.TextSelection(self.layer['parameters_frame'], 'Restorer2DetTypeTextSel', '2. Detection Alignment', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72)
+        row = row + 1
+        self.widget['Restorer2Slider'] = GE.Slider2(self.layer['parameters_frame'], 'Restorer2Slider', '2. Restorer Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.72)
+
         # Frame Restorer
         row = row + 1
         self.widget['FrameEnhancerTypeTextSel'] = GE.TextSelectionComboBox(self.layer['parameters_frame'], 'FrameEnhancerTypeTextSel', 'Enhancer Type', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72, 150)
@@ -1356,10 +1373,8 @@ class GUI(tk.Tk):
         self.widget['DiffSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'DiffSwitch', 'Differencing', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
         row = row + 1
         self.widget['DiffSlider'] = GE.Slider2(self.layer['parameters_frame'], 'DiffSlider', 'Amount', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
-
-        # Blur
         row = row + 1
-        self.widget['BlendSlider'] = GE.Slider2(self.layer['parameters_frame'], 'BlendSlider', 'Overall Mask Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        self.widget['DiffingBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'DiffingBlurSlider', 'Diff Blend Amount', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
 
         # Occluder
         row = row + 1
@@ -1372,7 +1387,13 @@ class GUI(tk.Tk):
         self.widget['DFLXSegSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'DFLXSegSwitch', 'DFL XSeg', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
         row = row + 1
         self.widget['DFLXSegSlider'] = GE.Slider2(self.layer['parameters_frame'], 'DFLXSegSlider', 'Size', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['OccluderBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'OccluderBlurSlider', 'Occluder/XSeg Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
 
+        # FinalBlurSlider
+        row = row + 1
+        self.widget['FinalBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'FinalBlurSlider', 'Final Face Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)            
+        
         # DFL RCT Color Transfer
         row = row + 1
         self.widget['DFLRCTColorSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'DFLRCTColorSwitch', 'DFL RCT Color Transfer', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady+5)
@@ -1424,9 +1445,12 @@ class GUI(tk.Tk):
         # FaceParser - Face
         row = row + 1
         self.widget['FaceParserSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'FaceParserSwitch', 'Face Parser', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
+
         #Face Background & Neck
         row = row + 1
         self.widget['FaceParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'FaceParserSlider', 'Background', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
+        row = row + 1
+        self.widget['BGParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'BGParserBlurSlider', 'BG Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
         row = row + 1
         self.widget['NeckParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'NeckParserSlider', 'Neck', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
 
@@ -1454,6 +1478,24 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['LowerLipParserSlider'] = GE.Slider2(self.layer['parameters_frame'], 'LowerLipParserSlider', 'Lower Lip', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
 
+        row = row + 1
+        self.widget['ParserBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'ParserBlurSlider', 'FaceParser Blur', 3, self.update_data, 'parameter', 300, 20, row, 0, padx, pady, 0.62, 40)
+
+        # Autocolor
+        row = row + 1
+        self.widget['AutoColorSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'AutoColorSwitch', 'AutoColor', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
+        row = row + 1        
+        self.widget['AutoColorTypeTextSel'] = GE.TextSelection(self.layer['parameters_frame'], 'AutoColorTypeTextSel', 'Transfer Type', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['AutoColorSlider'] = GE.Slider2(self.layer['parameters_frame'], 'AutoColorSlider', 'AutoColor Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+
+        # Jpeg Compression
+        row = row + 1
+        self.widget['JpegCompressionSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'JpegCompressionSwitch', 'Jpeg Compression', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
+        row = row + 1
+        self.widget['JpegCompressionSlider'] = GE.Slider2(self.layer['parameters_frame'], 'JpegCompressionSlider', 'Jpeg Value', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+       
+        
         # Color Adjustments
         row = row + 1
         self.widget['ColorSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'ColorSwitch', 'Color Adjustments', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)
@@ -3182,6 +3224,15 @@ class GUI(tk.Tk):
                         "GPEN512": "GPEN-512"
                     }.get(value, value)  # Default to the original value if no match
                 },
+                "Restorer2TypeTextSel": lambda value, loaded_marker: {
+                    "Restorer2TypeTextSel": {
+                        "GFPGAN": "GFPGAN-v1.4",
+                        "CF": "CodeFormer",
+                        "GPEN256": "GPEN-256",
+                        "GPEN512": "GPEN-512"
+                    }.get(value, value)  # Default to the original value if no match
+                },                
+                
                 # Fix Face Parser Mouth Slider which is more granular now.
                 # Split former MouthSlider in two equal parts and assign to upper/lower lips.
                 "MouthParserSlider": lambda value, loaded_marker: (
@@ -3257,6 +3308,7 @@ class GUI(tk.Tk):
 
     def clear_mem(self):
         self.widget['RestorerSwitch'].set(False)
+        self.widget['Restorer2Switch'].set(False)        
         self.widget['OccluderSwitch'].set(False)
         self.widget['FaceParserSwitch'].set(False)
         self.widget['CLIPSwitch'].set(False)
@@ -3304,6 +3356,12 @@ class GUI(tk.Tk):
         self.control['MaskViewButton'] = self.widget['MaskViewButton'].get()
         self.add_action('control', self.control)
         self.add_action('get_requested_video_frame', self.video_slider.get())
+        
+    def toggle_compareview(self):
+        self.widget['CompareViewButton'].toggle_button()
+        self.control['CompareViewButton'] = self.widget['CompareViewButton'].get()        
+        self.add_action('control', self.control)
+        self.add_action('get_requested_video_frame', self.video_slider.get())        
 
     def parameter_io(self, task, initial_dir="."):
         if task == 'save':
@@ -3406,4 +3464,3 @@ class GUI(tk.Tk):
 
     def disable_record_button(self):
         self.widget['TLRecButton'].disable_button()
-
