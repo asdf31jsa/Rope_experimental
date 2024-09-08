@@ -1332,13 +1332,16 @@ class VideoManager():
             img_orig_mask = torch.zeros((1, 512, 512), dtype=torch.float32, device=device).contiguous()
 
             if parameters['RestoreMouthSwitch']:
-                img_swap_mask = self.restore_mouth(img_orig_mask, img_swap_mask, dst_kps_5, parameters['ParserBlurSlider'], parameters['RestoreMouthSlider']/100, parameters['RestoreMouthFeatherSlider'], parameters['RestoreMouthSizeSlider']/100, parameters['RestoreMouthRadiusFactorXSlider'], parameters['RestoreMouthRadiusFactorYSlider'])
+                img_swap_mask = self.restore_mouth(img_orig_mask, img_swap_mask, dst_kps_5, parameters['RestoreMouthSlider']/100, parameters['RestoreMouthFeatherSlider'], parameters['RestoreMouthSizeSlider']/100, parameters['RestoreMouthRadiusFactorXSlider'], parameters['RestoreMouthRadiusFactorYSlider'])
                 img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
 
             if parameters['RestoreEyesSwitch']:
-                img_swap_mask = self.restore_eyes(img_orig_mask, img_swap_mask, dst_kps_5, parameters['ParserBlurSlider'], parameters['RestoreEyesSlider']/100, parameters['RestoreEyesFeatherSlider'], parameters['RestoreEyesSizeSlider'],  parameters['RestoreEyesRadiusFactorXSlider'], parameters['RestoreEyesRadiusFactorYSlider'])
+                img_swap_mask = self.restore_eyes(img_orig_mask, img_swap_mask, dst_kps_5, parameters['RestoreEyesSlider']/100, parameters['RestoreEyesFeatherSlider'], parameters['RestoreEyesSizeSlider'],  parameters['RestoreEyesRadiusFactorXSlider'], parameters['RestoreEyesRadiusFactorYSlider'])
                 img_swap_mask = torch.clamp(img_swap_mask, 0, 1)
 
+            gauss = transforms.GaussianBlur(parameters['Eyes_Mouth_BlurSlider']*2+1, (parameters['Eyes_Mouth_BlurSlider']+1)*0.2)
+            img_swap_mask = gauss(img_swap_mask)
+                
             img_swap_mask = t128(img_swap_mask)
             swap_mask = torch.mul(swap_mask, img_swap_mask)
 
@@ -1384,6 +1387,15 @@ class VideoManager():
         #gauss = transforms.GaussianBlur(parameters['BlendSlider']*2+1, (parameters['BlendSlider']+1)*0.2)
         #swap_mask = gauss(swap_mask)
         
+        if parameters['FinalBlurSlider'] > 0:
+            final_blur_strength = parameters["FinalBlurSlider"]  # Ein Parameter steuert beides
+            # Bestimme kernel_size und sigma basierend auf dem Parameter
+            kernel_size = 2 * final_blur_strength + 1  # Ungerade Zahl, z.B. 3, 5, 7, ...
+            sigma = final_blur_strength * 0.3  # Sigma proportional zur Stärke
+            # Gaussian Blur anwenden
+            gaussian_blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+            swap = gaussian_blur(swap)          
+        
         # Apply color corerctions
         if parameters['ColorSwitch']:
             # print(parameters['ColorGammaSlider'])
@@ -1403,14 +1415,11 @@ class VideoManager():
             swap = v2.functional.adjust_sharpness(swap, parameters['ColorSharpnessSlider'])
             swap = v2.functional.adjust_hue(swap, parameters['ColorHueSlider'])
         
-        if parameters['FinalBlurSlider'] > 0:
-            final_blur_strength = parameters["FinalBlurSlider"]  # Ein Parameter steuert beides
-            # Bestimme kernel_size und sigma basierend auf dem Parameter
-            kernel_size = 2 * final_blur_strength + 1  # Ungerade Zahl, z.B. 3, 5, 7, ...
-            sigma = final_blur_strength * 0.3  # Sigma proportional zur Stärke
-            # Gaussian Blur anwenden
-            gaussian_blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
-            swap = gaussian_blur(swap)   
+            if parameters['NoiseSlider'] > 0:
+                swap = swap.permute(1, 2, 0).type(torch.float32)
+                swap = swap + parameters['NoiseSlider']*torch.randn(512, 512, 3, device=device)
+                swap = torch.clamp(swap, 0, 255)  
+                swap = swap.permute(2, 0, 1)           
 
         if parameters['JpegCompressionSwitch']:   
         #if parameters["DiffSlider"] > 0:
@@ -1623,6 +1632,7 @@ class VideoManager():
         # Convert Torch tensors into CuPy arrays and ensure they are on the GPU
         source_image_np = source_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
         target_image_np = target_image.cpu().numpy().astype('float32').transpose(1, 2, 0)
+
         # normalize images [0, 1]
         source_image_np /= 255.0
         target_image_np /= 255.0
@@ -2247,7 +2257,7 @@ class VideoManager():
 
         return mask
 
-    def restore_mouth(self, img_orig, img_swap, kpss_orig, ParserBlurSlider, blend_alpha=0.5, feather_radius=10, size_factor=0.5, radius_factor_x=1.0, radius_factor_y=1.0):
+    def restore_mouth(self, img_orig, img_swap, kpss_orig, blend_alpha=0.5, feather_radius=10, size_factor=0.5, radius_factor_x=1.0, radius_factor_y=1.0):
         """
         Extract mouth from img_orig using the provided keypoints and place it in img_swap.
 
@@ -2290,20 +2300,10 @@ class VideoManager():
         img_swap_mouth = img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax]
         blended_mouth = blend_alpha * img_swap_mouth + (1 - blend_alpha) * mouth_region_orig
         
-        # Schritt 1: Maske in 3D-Form bringen (1, 44, 60), indem eine Kanal-Dimension hinzugefügt wird
-        #mask_3d = mouth_mask.unsqueeze(0)  # Fügt die Kanal-Dimension hinzu, jetzt (1, 44, 60)
-
-        # Schritt 2: Gaussian Blur anwenden
-        # kernel_size muss eine ungerade Zahl sein (z.B. 5), sigma ist der Standardabweichungswert
-        #gauss = transforms.GaussianBlur(ParserBlurSlider*2+1, (ParserBlurSlider+1)*0.2)
-        #mouth_mask = gauss(mask_3d)
-        # Schritt 3: Zurück zur 2D-Form (44, 60), indem die Kanal-Dimension entfernt wird
-        #mouth_mask = mouth_mask.squeeze(0)  # Entfernt die Kanal-Dimension
-
         img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax] = mouth_mask * blended_mouth + (1 - mouth_mask) * img_swap_mouth
         return img_swap
 
-    def restore_eyes(self, img_orig, img_swap, kpss_orig, ParserBlurSlider, blend_alpha=0.5, feather_radius=10, size_factor=3.5, radius_factor_x=1.0, radius_factor_y=1.0):
+    def restore_eyes(self, img_orig, img_swap, kpss_orig, blend_alpha=0.5, feather_radius=10, size_factor=3.5, radius_factor_x=1.0, radius_factor_y=1.0):
         """
         Extract eyes from img_orig using the provided keypoints and place them in img_swap.
 
@@ -2346,18 +2346,7 @@ class VideoManager():
 
             img_swap_eye = img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax]
             blended_eye = blend_alpha * img_swap_eye + (1 - blend_alpha) * eye_region_orig
-            
-            # Schritt 1: Maske in 3D-Form bringen (1, 44, 60), indem eine Kanal-Dimension hinzugefügt wird
-            #mask_3d = eye_mask.unsqueeze(0)  # Fügt die Kanal-Dimension hinzu, jetzt (1, 44, 60)
-
-            # Schritt 2: Gaussian Blur anwenden
-            # kernel_size muss eine ungerade Zahl sein (z.B. 5), sigma ist der Standardabweichungswert
-            #gauss = transforms.GaussianBlur(ParserBlurSlider*2+1, (ParserBlurSlider+1)*0.2)
-            #eye_mask = gauss(mask_3d)
-            # Schritt 3: Zurück zur 2D-Form (44, 60), indem die Kanal-Dimension entfernt wird
-            #eye_mask = eye_mask.squeeze(0)  # Entfernt die Kanal-Dimension
-
-                
+                        
             img_swap[:, target_ymin:target_ymax, target_xmin:target_xmax] = eye_mask * blended_eye + (1 - eye_mask) * img_swap_eye
 
         # Process both eyes
