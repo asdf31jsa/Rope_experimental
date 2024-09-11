@@ -1,4 +1,16 @@
-8.9.24 added:
+pip install:
+- cupy (when on cuda12), or cupy-cuda11x (when on cuda11)
+- imageio
+
+11.9.24:
+- added X/Y-axis offset sliders for mouth restorer and for eyes restorer
+- added eyes spacing offset slider for eyes restorer (o ---- o, o -- o)
+- added on/off switch for FinalBlurSlider
+- added back vanilla "overall mask blend" (dont know if usefull)
+- gamma slider (color) increase rate 0.2 -> 0.1
+- small gui changes
+- 
+8.9.24:
 - added eye/mouth mask blur slider for the edges of the mask (for "Restore Eyes" and "Restore Mouth")
 - added noise slider for face (active when "Color Adjustment" is activated)
 - 1 input file per row instead of 2. increased size of input thumbnails and longer filenames. 
@@ -11,11 +23,6 @@
 - color transfer from target face to swapped face (4 experimantel versions for testing)
 - seperate Blend sliders for mask manipulation + diffing (Occlusion/Xseg Blur, Faceparser Blur, Background Facceparser Blur, Face Diffing Blur)
 - Jpeg Compression effect for faces (for low quality targets. and topaz likes it in my experience)
-
-pip install:
-- cupy (when on cuda12), or cupy-cuda11x (when on cuda11)
-- imageio
-
 
 -----------------------------------------
 
