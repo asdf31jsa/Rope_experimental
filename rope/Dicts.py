@@ -190,6 +190,10 @@ DEFAULT_DATA = {
 'AutoColorSwitchInfoText':          'AutoColor Transfer Type. 1. Hans Test without mask, 2. Hans Test with mask, 3. DFL Method without mask, 4. DFL Original Method',
 'AutoColorSwitchState':             False,
 
+# Final Blur Switches
+'FinalBlurSwitchInfoText':        'Final Blur Switch: \nBlur at the end of pipeline',
+'FinalBlurSwitchState':           False,
+
 # Switches
 'ColorSwitchInfoText':              'RGB ADJUSTMENT:\nFine-tune the RGB color values of the swap.',
 'ColorSwitchState':                 False,
@@ -252,22 +256,23 @@ DEFAULT_DATA = {
 'JpegCompressionSwitchState':        False,
 
 # Sliders
-#'BlendSliderAmount':                5,
-#'BlendSliderInc':                   1,
-#'BlendSliderInfoText':              'BLEND:\nCombined masks blending distance. Is not applied to the border masks.',
-#'BlendSliderMax':                   100,
-#'BlendSliderMin':                   0,
+'BlendSliderAmount':                5,
+'BlendSliderInc':                   1,
+'BlendSliderInfoText':              'BLEND:\nCombined masks blending distance. Is not applied to the border masks.',
+'BlendSliderMax':                   100,
+'BlendSliderMin':                   0,
 
 'FinalBlurSliderAmount':           0,
 'FinalBlurSliderInc':              1,
 'FinalBlurSliderInfoText':         'BORDER MASK BLEND:\nBorder mask blending distance.',
-'FinalBlurSliderMax':              10,
+'FinalBlurSliderMax':              50,
 'FinalBlurSliderMin':              0,
 'BorderBlurSliderAmount':           10,
 'BorderBlurSliderInc':              1,
 'BorderBlurSliderInfoText':         'BORDER MASK BLEND:\nBorder mask blending distance.',
 'BorderBlurSliderMax':              100,
 'BorderBlurSliderMin':              0,
+
 'BorderBottomSliderAmount':         10,
 'BorderBottomSliderInc':            1,
 'BorderBottomSliderInfoText':       'BOTTOM BORDER DISTANCE:\nA rectangle with adjustable top, bottom, and sides that blends the swapped face rseult back into the original image.',
@@ -510,6 +515,23 @@ DEFAULT_DATA = {
 'RestoreEyesRadiusFactorYSliderMax':         3.0,
 'RestoreEyesRadiusFactorYSliderMin':         0.3,
 
+'RestoreEyesXoffsetSliderAmount':      0,
+'RestoreEyesXoffsetSliderInc':         1,
+'RestoreEyesXoffsetSliderInfoText':    'Y RestoreEyesYoffsetSlider :\nMoves the Eyes Mask on the X Achsis',
+'RestoreEyesXoffsetSliderMax':         300,
+'RestoreEyesXoffsetSliderMin':         -300,
+'RestoreEyesYoffsetSliderAmount':      0,
+'RestoreEyesYoffsetSliderInc':         1,
+'RestoreEyesYoffsetSliderInfoText':    'Y RestoreEyesYoffsetSlider :\nMoves the Eyes Mask on the Y Achsis',
+'RestoreEyesYoffsetSliderMax':         300,
+'RestoreEyesYoffsetSliderMin':         -300,
+'RestoreEyesSpacingOffsetSliderAmount':      0,
+'RestoreEyesSpacingOffsetSliderInc':         1,
+'RestoreEyesSpacingOffsetSliderInfoText':    'Y RestoreEyesSpacingOffsetSlider :\nChange the Eyes Spacing distance',
+'RestoreEyesSpacingOffsetSliderMax':         200,
+'RestoreEyesSpacingOffsetSliderMin':         -200,
+
+
 'RestoreMouthSliderAmount':               50,
 'RestoreMouthSliderInc':                  1,
 'RestoreMouthSliderInfoText':             'MOUTH BLEND :\nIncrease this to show more of the swapped Mouth. Decrease it to show more of the original Mouth',
@@ -539,6 +561,17 @@ DEFAULT_DATA = {
 'RestoreMouthRadiusFactorYSliderInfoText':    'Y MOUTH RADIUS FACTOR :\nThese parameters determine the shape of the mask. If both are equal to 1.0, the mask will be circular. If either one is greater or less than 1.0, the mask will become oval, stretching or shrinking along the corresponding direction.',
 'RestoreMouthRadiusFactorYSliderMax':         3.0,
 'RestoreMouthRadiusFactorYSliderMin':         0.3,
+
+'RestoreMouthXoffsetSliderAmount':      0,
+'RestoreMouthXoffsetSliderInc':         1,
+'RestoreMouthXoffsetSliderInfoText':    'Y RestoreMouthYoffsetSlider :\nMoves the Mouth Mask on the X Achsis',
+'RestoreMouthXoffsetSliderMax':         300,
+'RestoreMouthXoffsetSliderMin':         -300,
+'RestoreMouthYoffsetSliderAmount':      0,
+'RestoreMouthYoffsetSliderInc':         1,
+'RestoreMouthYoffsetSliderInfoText':    'Y RestoreMouthYoffsetSlider :\nMoves the Mouth Mask on the Y Achsis',
+'RestoreMouthYoffsetSliderMax':         300,
+'RestoreMouthYoffsetSliderMin':         -300,
 
 'OccluderSliderAmount':             0,
 'OccluderSliderInc':                1,
@@ -636,14 +669,14 @@ DEFAULT_DATA = {
 'CLIPSliderMin':                    0,
 
 'ColorGammaSliderAmount':                 1,
-'ColorGammaSliderInc':                    0.02,
+'ColorGammaSliderInc':                    0.01,
 'ColorGammaSliderInfoText':               'GAMMA VALUE:\nChanges Gamma.',
 'ColorGammaSliderMax':                    2,
 'ColorGammaSliderMin':                    0,
 
 'NoiseSliderAmount':                 0,
 'NoiseSliderInc':                    0.5,
-'NoiseSliderInfoText':               'GAMMA VALUE:\nChanges Gamma.',
+'NoiseSliderInfoText':               'GAMMA VALUE:\nAdd noise to swapped face',
 'NoiseSliderMax':                    20,
 'NoiseSliderMin':                    0,
 
