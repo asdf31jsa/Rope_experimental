@@ -9,7 +9,7 @@ import time
 import numpy as np
 import numexpr as ne
 import cupy as cp
-import piq
+#import piq
 #from pybrisque import BRISQUE
 from skimage import transform as trans
 import subprocess
