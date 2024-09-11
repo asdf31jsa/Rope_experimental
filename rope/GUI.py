@@ -1114,7 +1114,7 @@ class GUI(tk.Tk):
         # Left Side
         self.layer['play_controls_left'] = tk.Frame(self.layer['preview_frame'], style.canvas_frame_label_2, height=30, width=100 )
         self.layer['play_controls_left'].grid(row=0, column=0, sticky='NEWS', pady=0)
-        self.widget['SaveImageButton'] = GE.Button(self.layer['play_controls_left'], 'SaveImageButton', 2, self.save_image, None, 'control', x=10, y=5, width=100)
+        self.widget['SaveImageButton'] = GE.Button(self.layer['play_controls_left'], 'SaveImageButton', 2, self.save_image, None, 'control', x=0, y=5, width=100)
 
         # Center
         cente_frame = tk.Frame(self.layer['preview_frame'], style.canvas_frame_label_2, height=30, )
@@ -1150,7 +1150,7 @@ class GUI(tk.Tk):
     # Images
         self.layer['image_controls'] = tk.Frame(self.layer['preview_column'], style.canvas_frame_label_2, height=80)
         self.layer['image_controls'].grid(row=2, column=0, rowspan=2, sticky='NEWS', pady=0)
-        self.widget['SaveImageButton'] = GE.Button(self.layer['image_controls'], 'SaveImageButton', 2, self.save_image, None, 'control', x=10, y=5, width=100)
+        self.widget['SaveImageButton'] = GE.Button(self.layer['image_controls'], 'SaveImageButton', 2, self.save_image, None, 'control', x=0, y=5, width=100)
         self.widget['AutoSwapButton'] = GE.Button(self.layer['image_controls'], 'AutoSwapButton', 2, self.toggle_auto_swap, None, 'control', x=150, y=5, width=100)
 
         self.layer['image_controls'].grid_forget()
@@ -1172,11 +1172,11 @@ class GUI(tk.Tk):
         button_frame = tk.Frame(ff_frame, style.canvas_frame_label_2, height = 99, width = 224)
         button_frame.grid( row = 0, column = 0, )
 
-        self.widget['FindFacesButton'] = GE.Button(button_frame, 'FindFaces', 2, self.find_faces, None, 'control', x=0, y=0, width=112, height=33)
-        self.widget['ClearFacesButton'] = GE.Button(button_frame, 'ClearFaces', 2, self.clear_faces, None, 'control', x=0, y=33, width=112, height=33)        
-        self.widget['SwapFacesButton'] = GE.Button(button_frame, 'SwapFaces', 2, self.toggle_swapper, None, 'control', x=112, y=0, width=112, height=33)
-        self.widget['EditFacesButton'] = GE.Button(button_frame, 'EditFaces', 2, self.toggle_faces_editor, None, 'control', x=112, y=33, width=112, height=33)
-        self.widget['EnhanceFrameButton'] = GE.Button(button_frame, 'EnhanceFrame', 2, self.toggle_enhancer, None, 'control', x=112, y=66, width=112, height=33)
+        self.widget['FindFacesButton'] = GE.Button(button_frame, 'FindFaces', 2, self.find_faces, None, 'control', x=112, y=0, width=112, height=33)
+        self.widget['ClearFacesButton'] = GE.Button(button_frame, 'ClearFaces', 2, self.clear_faces, None, 'control', x=112, y=33, width=112, height=33)        
+        self.widget['SwapFacesButton'] = GE.Button(button_frame, 'SwapFaces', 2, self.toggle_swapper, None, 'control', x=0, y=0, width=112, height=33)
+        self.widget['EditFacesButton'] = GE.Button(button_frame, 'EditFaces', 2, self.toggle_faces_editor, None, 'control', x=0, y=33, width=112, height=33)
+        self.widget['EnhanceFrameButton'] = GE.Button(button_frame, 'EnhanceFrame', 2, self.toggle_enhancer, None, 'control', x=0, y=66, width=112, height=33)
 
 
         # Scroll Canvas
@@ -1393,8 +1393,14 @@ class GUI(tk.Tk):
 
         # FinalBlurSlider
         row = row + 1
+        self.widget['FinalBlurSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'FinalBlurSwitch', 'Final Blur Switch', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady)        
+        row = row + 1
         self.widget['FinalBlurSlider'] = GE.Slider2(self.layer['parameters_frame'], 'FinalBlurSlider', 'Final Face Blur', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)            
         
+        # Overall MaskBlendSlider
+        row = row + 1
+        self.widget['BlendSlider'] = GE.Slider2(self.layer['parameters_frame'], 'BlendSlider', 'Overall Mask Blend', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)            
+   
         # DFL RCT Color Transfer
         row = row + 1
         self.widget['DFLRCTColorSwitch'] = GE.Switch2(self.layer['parameters_frame'], 'DFLRCTColorSwitch', 'DFL RCT Color Transfer', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady+5)
@@ -1430,6 +1436,12 @@ class GUI(tk.Tk):
         self.widget['RestoreEyesRadiusFactorXSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesRadiusFactorXSlider', 'Eyes Radius Factor: X', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
         self.widget['RestoreEyesRadiusFactorYSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesRadiusFactorYSlider', 'Eyes Radius Factor: Y', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['RestoreEyesSpacingOffsetSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesSpacingOffsetSlider', 'Eyes Spacing Offset', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['RestoreEyesXoffsetSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesXoffsetSlider', 'Eyes Offset: X', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['RestoreEyesYoffsetSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreEyesYoffsetSlider', 'Eyes Offset: Y', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
 
         #Restore Mouth
         row = row + 1
@@ -1444,6 +1456,10 @@ class GUI(tk.Tk):
         self.widget['RestoreMouthRadiusFactorXSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthRadiusFactorXSlider', 'Mouth Radius Factor: X', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
         row = row + 1
         self.widget['RestoreMouthRadiusFactorYSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthRadiusFactorYSlider', 'Mouth Radius Factor: Y', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['RestoreMouthXoffsetSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthXoffsetSlider', 'Mouth Offset: X', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
+        row = row + 1
+        self.widget['RestoreMouthYoffsetSlider'] = GE.Slider2(self.layer['parameters_frame'], 'RestoreMouthYoffsetSlider', 'Mouth Offset: Y', 3, self.update_data, 'parameter', 398, 20, row, 0, padx, pady, 0.62)
 
         # FaceParser - Face
         row = row + 1
@@ -2613,7 +2629,7 @@ class GUI(tk.Tk):
         delx, dely = 100, 120
         if self.widget['PreviewModeTextSel'].get()== 'Image':#images
             for i in range(len(images)):
-                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 190, width = 190))
+                self.target_media_buttons.append(tk.Button(self.target_media_canvas, style.media_button_off_3, height = 115, width = 190))
 
                 rgb_video = Image.fromarray(images[i][0])
                 self.target_media.append(ImageTk.PhotoImage(image=rgb_video))
