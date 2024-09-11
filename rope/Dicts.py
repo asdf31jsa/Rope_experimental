@@ -256,7 +256,7 @@ DEFAULT_DATA = {
 'JpegCompressionSwitchState':        False,
 
 # Sliders
-'BlendSliderAmount':                5,
+'BlendSliderAmount':                0,
 'BlendSliderInc':                   1,
 'BlendSliderInfoText':              'BLEND:\nCombined masks blending distance. Is not applied to the border masks.',
 'BlendSliderMax':                   100,
