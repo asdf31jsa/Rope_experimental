@@ -30,6 +30,7 @@ from os.path import isfile, join
 import inspect #print(inspect.currentframe().f_back.f_code.co_name, 'resize_image')
 import platform
 from platform import system
+from rope.Dicts import CAMERA_BACKENDS
 
 import gc
 # Face Landmarks
@@ -1301,6 +1302,10 @@ class GUI(tk.Tk):
         row = row + 1
         self.widget['SwapperTypeTextSel'] = GE.TextSelection(self.layer['parameters_frame'], 'SwapperTypeTextSel', 'Swapper Resolution', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72)
 
+        #Webcam Backend
+        row = row + 1
+        self.widget['WebCamBackendSel'] = GE.TextSelectionComboBox(self.layer['parameters_frame'], 'WebCamBackendSel', 'Webcam Backend', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72, 150)
+
         #Webcam Max Resolution
         row = row + 1
         self.widget['WebCamMaxResolSel'] = GE.TextSelectionComboBox(self.layer['parameters_frame'], 'WebCamMaxResolSel', 'Webcam Resolution', 3, self.update_data, 'parameter', 'parameter', 398, 20, row, 0, padx, pady, 0.72, 150)
@@ -1839,7 +1844,11 @@ class GUI(tk.Tk):
             elif name=='WebCamMaxResolSel' or name=='WebCamMaxFPSSel':
                 # self.add_action(load_target_video()
                 self.add_action('change_webcam_resolution_and_fps')
-
+            elif name=='WebCamBackendSel':
+                self.add_action('change_webcam_resolution_and_fps')
+                self.populate_target_videos()
+            elif name=='ThreadsSlider':
+                self.models.set_number_of_threads(self.parameters[name])
             # Face Editor
             '''
             elif mode=='parameter_face_editor':
@@ -2108,6 +2117,8 @@ class GUI(tk.Tk):
                                 provider_value = self.models.switch_providers_priority(temp[key])
                                 if provider_value != temp[key]:
                                     self.parameters[key] = provider_value
+                            elif key == "ThreadsSlider":
+                                self.models.set_number_of_threads(value)
                     except KeyError:
                         pass
 
@@ -2475,6 +2486,18 @@ class GUI(tk.Tk):
 
             # if shift find any other input faces and activate the state of all faces in between
             if modifier == 'shift':
+                # Check if there is any dfl models already selected.
+                if self.source_faces[button]["DFLModel"]:
+                    for i in range(len(self.source_faces)):
+                        if i==button:
+                            continue
+                        if self.source_faces[i]["ButtonState"] and self.source_faces[i]['DFLModel'] :
+                            self.source_faces[button]["ButtonState"] = False
+                            messagebox.showinfo('You cannot combine DFL Models!','You cannot combine DFL Models!')
+                            for face in self.source_faces:
+                                face['ButtonState'] = False
+                            break
+
                 for i in range(button-1, self.shift_i_len-1, -1):
                     if self.source_faces[i]["ButtonState"]:
                         for j in range(i, button, 1):
@@ -2490,15 +2513,22 @@ class GUI(tk.Tk):
             for face in self.source_faces:
                 if face["ButtonState"]:
                     face["TKButton"].config(style.media_button_on_3)
-
                     if self.widget['PreviewModeTextSel'].get() == 'FaceLab':
                         self.add_action("load_target_image", face["file"])
                         self.image_loaded = True
 
+        if self.source_faces[button]['DFLModel']:
+            # Clear DFL models from memory
+            if self.models.dfl_models and self.parameters['DFLLoadOnlyOneSwitch']:
+                for model in list(self.models.dfl_models):
+                    if model!=self.source_faces[button]['DFLModel']:
+                        del self.models.dfl_models[model]._sess
+                        del self.models.dfl_models[model]
+                gc.collect()
+
         # Assign all active input faces to the active target face
         for tface in self.target_faces:
             if tface["ButtonState"]:
-
                 # Clear all of the assignments
                 tface["SourceFaceAssignments"] = []
                 tface['DFLModel'] = False
@@ -2510,7 +2540,9 @@ class GUI(tk.Tk):
                     # If the source face is active
                     if self.source_faces[j]["ButtonState"]:
                         tface["SourceFaceAssignments"].append(j)
-                        temp_holder.append(self.source_faces[j]['Embedding'])
+                        # Only append embedding if it is not a DFL model
+                        if not self.source_faces[j]['DFLModel']:
+                            temp_holder.append(self.source_faces[j]['Embedding'])
 
                         if self.source_faces[j]['DFLModel']:
                             # Clear DFL models from memory
@@ -2529,6 +2561,8 @@ class GUI(tk.Tk):
                         tface['AssignedEmbedding'] = np.mean(temp_holder, 0)
 
                     self.temp_emb = tface['AssignedEmbedding']
+                else:
+                    tface['AssignedEmbedding'] = []
 
                     # for k in range(512):
                     #     self.widget['emb_vec_' + str(k)].set(tface['AssignedEmbedding'][k], False)
@@ -2543,27 +2577,25 @@ class GUI(tk.Tk):
     def populate_target_videos(self):
         videos = []
         #Webcam setup
-        try:
-            for i in range(self.parameters['WebCamMaxNoSlider']):
-                if platform.system == 'Windows':
-                    try:
-                        camera_capture = cv2.VideoCapture(i, cv2.CAP_DSHOW)
-                    except:
-                        camera_capture = cv2.VideoCapture(i)
-                else:
-                    camera_capture = cv2.VideoCapture(i)
-                success, webcam_frame = camera_capture.read()
+        camera_backend = CAMERA_BACKENDS[self.parameters['WebCamBackendSel']]
+        for i in range(self.parameters['WebCamMaxNoSlider']):
+            try:
+                camera = cv2.VideoCapture(i, camera_backend)
+                if not camera.isOpened():
+                    continue
+                success, webcam_frame = camera.read()
+                if not success:
+                    continue
                 ratio = float(webcam_frame.shape[0]) / webcam_frame.shape[1]
-
                 new_height = 50
                 new_width = int(new_height / ratio)
                 webcam_frame = cv2.resize(webcam_frame, (new_width, new_height))
                 webcam_frame = cv2.cvtColor(webcam_frame, cv2.COLOR_BGR2RGB)
                 webcam_frame[:new_height, :new_width, :] = webcam_frame
                 videos.append([webcam_frame, f'Webcam {i}'])
-                camera_capture.release()
-        except:
-            pass
+                camera.release()
+            except Exception as e:
+                print(e)
 
         # Recursively read all media files from directory
         directory =  self.json_dict["source videos"]
@@ -3458,6 +3490,8 @@ class GUI(tk.Tk):
                 else:
                     self.models.delete_models()
                     torch.cuda.empty_cache()
+            elif key == "ThreadsSlider":
+                self.models.set_number_of_threads(value)
 
         for key, value in self.parameters_face_editor.items():
             self.widget[key].set(value, request_frame=False)

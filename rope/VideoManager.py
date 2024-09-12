@@ -35,7 +35,8 @@ import psutil
 from dfl.DFMModel import DFMModel
 
 device = 'cuda'
-
+from dfl.DFMModel import DFMModel
+from rope.Dicts import CAMERA_BACKENDS
 lock=threading.Lock()
 
 class VideoManager():
@@ -179,15 +180,8 @@ class VideoManager():
         self.video_file = file
         if self.webcam_selected(file):
             webcam_index = int(file[-1])
-            # Only use dshow if it is a Physical webcam in Windows
-            if platform.system == 'Windows':
-                try:
-                    self.capture = cv2.VideoCapture(webcam_index, cv2.CAP_DSHOW)
-                except:
-                    self.capture = cv2.VideoCapture(webcam_index)
-            else:
-                self.capture = cv2.VideoCapture(webcam_index)
-
+            camera_backend = CAMERA_BACKENDS[self.parameters['WebCamBackendSel']]
+            self.capture = cv2.VideoCapture(webcam_index, camera_backend)
             res_width, res_height = self.parameters['WebCamMaxResolSel'].split('x')
             self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, int(res_width))
             self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, int(res_height))
@@ -1121,7 +1115,8 @@ class VideoManager():
         original_face_128 = t128(original_face_256)
 
         if dfl_model:
-            latent = torch.from_numpy(self.models.calc_swapper_latent_dfl(s_e)).float().to('cuda')
+            latent = []
+            # latent = torch.from_numpy(self.models.calc_swapper_latent_dfl(s_e)).float().to('cuda')
             input_face_affined = original_face_512
             dim = 4
 
@@ -1259,7 +1254,6 @@ class VideoManager():
                     output = torch.clamp(output, 0, 255)
 
         output = output.permute(2, 0, 1)
-
         swap = t512(output)
 
         if parameters['StrengthSwitch']:
