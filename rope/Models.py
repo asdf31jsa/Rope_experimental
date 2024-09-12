@@ -1344,7 +1344,8 @@ class Models():
             kpss = []
             for i in range(kpss_5.shape[0]):
                 landmark_kpss_5, landmark_kpss, landmark_scores = self.run_detect_landmark(img_landmark, det[i], kpss_5[i], landmark_detect_mode, landmark_score, from_points)
-                kpss.append(landmark_kpss)
+                # Always add to kpss, regardless of the length of landmark_kpss.
+                kpss.append(landmark_kpss if len(landmark_kpss) > 0 else kpss_5[i])
                 if len(landmark_kpss_5) > 0:
                     if len(landmark_scores) > 0:
                         if np.mean(landmark_scores) > np.mean(score_values[i]):
@@ -1601,7 +1602,8 @@ class Models():
             kpss = []
             for i in range(kpss_5.shape[0]):
                 landmark_kpss_5, landmark_kpss, landmark_scores = self.run_detect_landmark(img_landmark, det[i], kpss_5[i], landmark_detect_mode, landmark_score, from_points)
-                kpss.append(landmark_kpss)
+                # Always add to kpss, regardless of the length of landmark_kpss.
+                kpss.append(landmark_kpss if len(landmark_kpss) > 0 else kpss_5[i])
                 if len(landmark_kpss_5) > 0:
                     if len(landmark_scores) > 0:
                         if np.mean(landmark_scores) > np.mean(score_values[i]):
@@ -1833,7 +1835,8 @@ class Models():
             kpss = []
             for i in range(kpss_5.shape[0]):
                 landmark_kpss_5, landmark_kpss, landmark_scores = self.run_detect_landmark(img_landmark, det[i], kpss_5[i], landmark_detect_mode, landmark_score, from_points)
-                kpss.append(landmark_kpss)
+                # Always add to kpss, regardless of the length of landmark_kpss.
+                kpss.append(landmark_kpss if len(landmark_kpss) > 0 else kpss_5[i])
                 if len(landmark_kpss_5) > 0:
                     if len(landmark_scores) > 0:
                         if np.mean(landmark_scores) > np.mean(score_values[i]):
@@ -2081,7 +2084,8 @@ class Models():
             kpss = []
             for i in range(kpss_5.shape[0]):
                 landmark_kpss_5, landmark_kpss, landmark_scores = self.run_detect_landmark(img_landmark, det[i], kpss_5[i], landmark_detect_mode, landmark_score, from_points)
-                kpss.append(landmark_kpss)
+                # Always add to kpss, regardless of the length of landmark_kpss.
+                kpss.append(landmark_kpss if len(landmark_kpss) > 0 else kpss_5[i])
                 if len(landmark_kpss_5) > 0:
                     if len(landmark_scores) > 0:
                         if np.mean(landmark_scores) > np.mean(score_values[i]):

@@ -28,6 +28,22 @@ pip install:
 
 ![image](https://github.com/Alucard24/Rope/releases/download/splash/splash_next.png)
 
+Next-0.8.24
+Contributors: @argenspin
+
+New Features:
+Merge latest @argenspin updates. Big thanks to him.
+
+Changes:
+Update requirements: Upgrade torch to 2.4.1 version.
+Add thread synchronization for TensorRT-Engine with Settings.
+Remove useless syncvec variable. Use instead torch.cuda.synchronize() function.
+
+Bug Fixes:
+Better TensorRT-Engine models detection.
+kpss variable must be an array not a list.
+Always add to kpss, regardless of the length of landmark_kpss.
+
 Next-0.8.23
 Contributors: @KwaiVGI, @warmshao, @argenspin
 
