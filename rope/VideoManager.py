@@ -961,7 +961,9 @@ class VideoManager():
 
                 if control['EditFacesButton']:
                     parameters_face_editor = self.face_editor.get_named_parameters(frame_number, i + 1)
-                    img = self.func_w_test("swap_video", self.swap_edit_face_core, img, fface[1], parameters, parameters_face_editor.copy(), control)
+                    # apply edit faces only if named parameters are not as default.
+                    if not self.face_editor.are_named_parameters_default(parameters_face_editor):
+                        img = self.func_w_test("swap_video", self.swap_edit_face_core, img, fface[1], parameters, parameters_face_editor.copy(), control)
 
             img = img.permute(1,2,0)
             if not control['MaskViewButton'] and parameters['OrientSwitch']:

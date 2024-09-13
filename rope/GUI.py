@@ -185,6 +185,8 @@ class FaceEditor:
             "EyeGazeVerticalSlider": 18
         }
 
+        self.default_named_parameters = {name: self.default_parameters[index] for name, index in self.parameter_map.items()}
+
     def add_parameters(self, frame_number, face_id, parameters):
         if frame_number not in self.data:
             self.data[frame_number] = {}
@@ -203,6 +205,18 @@ class FaceEditor:
         named_parameters = {name: parameters[index] for name, index in self.parameter_map.items()}
 
         return named_parameters
+
+    def are_parameters_default(self, parameters):
+        """
+        Verifica se i parameters forniti sono uguali a self.default_parameters.
+        """
+        return parameters == self.default_parameters
+
+    def are_named_parameters_default(self, named_parameters):
+        """
+        Verifica se i named_parameters forniti sono uguali a self.default_parameters.
+        """
+        return named_parameters == self.default_named_parameters
 
     def get_all_parameters_for_frame(self, frame_number):
         return self.data.get(frame_number, {})

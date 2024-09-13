@@ -1352,7 +1352,7 @@ class Models():
                             kpss_5[i] = landmark_kpss_5
                     else:
                         kpss_5[i] = landmark_kpss_5
-            kpss = np.array(kpss)
+            kpss = np.array(kpss, dtype=object)
 
         return det, kpss_5, kpss
 
@@ -1610,7 +1610,7 @@ class Models():
                             kpss_5[i] = landmark_kpss_5
                     else:
                         kpss_5[i] = landmark_kpss_5
-            kpss = np.array(kpss)
+            kpss = np.array(kpss, dtype=object)
 
         return det, kpss_5, kpss
 
@@ -1843,7 +1843,7 @@ class Models():
                             kpss_5[i] = landmark_kpss_5
                     else:
                         kpss_5[i] = landmark_kpss_5
-            kpss = np.array(kpss)
+            kpss = np.array(kpss, dtype=object)
 
         return det, kpss_5, kpss
 
@@ -2092,7 +2092,7 @@ class Models():
                             kpss_5[i] = landmark_kpss_5
                     else:
                         kpss_5[i] = landmark_kpss_5
-            kpss = np.array(kpss)
+            kpss = np.array(kpss, dtype=object)
 
         return det, kpss_5, kpss
 
@@ -2592,145 +2592,147 @@ class Models():
     #def get_kp_info(self, x: torch.Tensor, **kwargs) -> dict:
     def lp_motion_extractor(self, img, face_editor_type='Human-Face', **kwargs) -> dict:
         kp_info = {}
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_motion_extractor_model:
-                    if not os.path.exists("./models/liveportrait_onnx/motion_extractor.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/motion_extractor.onnx",
-                                 trt_model_path=None, precision="fp32",
-                                 verbose=False
-                                )
-                    self.lp_motion_extractor_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/motion_extractor.trt", pool_size=self.nThreads)
-
-            motion_extractor_model = self.lp_motion_extractor_model
-
-            # prepare_source
-            I_s = torch.div(img.type(torch.float32), 255.)
-            I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
-            I_s = torch.unsqueeze(I_s, 0).contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["img"] = I_s
-            preds_dict = motion_extractor_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = motion_extractor_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            kp_info = {
-                'pitch': preds_dict["pitch"],
-                'yaw': preds_dict["yaw"],
-                'roll': preds_dict["roll"],
-                't': preds_dict["t"],
-                'exp': preds_dict["exp"],
-                'scale': preds_dict["scale"],
-                'kp': preds_dict["kp"]
-            }
-
-            nvtx.range_pop()
-
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_motion_extractor_model:
-                    self.lp_motion_extractor_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/motion_extractor.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_motion_extractor_model:
+                        if not os.path.exists("./models/liveportrait_onnx/motion_extractor." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/motion_extractor.onnx",
+                                     trt_model_path=None, precision="fp32",
+                                     verbose=False
+                                    )
+                        self.lp_motion_extractor_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/motion_extractor." + trt.__version__ + ".trt", pool_size=self.nThreads)
 
                 motion_extractor_model = self.lp_motion_extractor_model
 
-            # prepare_source
-            I_s = torch.div(img.type(torch.float32), 255.)
-            I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
-            I_s = torch.unsqueeze(I_s, 0).contiguous()
+                # prepare_source
+                I_s = torch.div(img.type(torch.float32), 255.)
+                I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
+                I_s = torch.unsqueeze(I_s, 0).contiguous()
 
-            pitch = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
-            yaw = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
-            roll = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
-            t = torch.empty((1,3), dtype=torch.float32, device='cuda').contiguous()
-            exp = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
-            scale = torch.empty((1,1), dtype=torch.float32, device='cuda').contiguous()
-            kp = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+                nvtx.range_push("forward")
 
-            io_binding = motion_extractor_model.io_binding()
-            io_binding.bind_input(name='img', device_type='cuda', device_id=0, element_type=np.float32, shape=I_s.size(), buffer_ptr=I_s.data_ptr())
-            io_binding.bind_output(name='pitch', device_type='cuda', device_id=0, element_type=np.float32, shape=pitch.size(), buffer_ptr=pitch.data_ptr())
-            io_binding.bind_output(name='yaw', device_type='cuda', device_id=0, element_type=np.float32, shape=yaw.size(), buffer_ptr=yaw.data_ptr())
-            io_binding.bind_output(name='roll', device_type='cuda', device_id=0, element_type=np.float32, shape=roll.size(), buffer_ptr=roll.data_ptr())
-            io_binding.bind_output(name='t', device_type='cuda', device_id=0, element_type=np.float32, shape=t.size(), buffer_ptr=t.data_ptr())
-            io_binding.bind_output(name='exp', device_type='cuda', device_id=0, element_type=np.float32, shape=exp.size(), buffer_ptr=exp.data_ptr())
-            io_binding.bind_output(name='scale', device_type='cuda', device_id=0, element_type=np.float32, shape=scale.size(), buffer_ptr=scale.data_ptr())
-            io_binding.bind_output(name='kp', device_type='cuda', device_id=0, element_type=np.float32, shape=kp.size(), buffer_ptr=kp.data_ptr())
+                feed_dict = {}
+                feed_dict["img"] = I_s
+                preds_dict = motion_extractor_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = motion_extractor_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                kp_info = {
+                    'pitch': preds_dict["pitch"],
+                    'yaw': preds_dict["yaw"],
+                    'roll': preds_dict["roll"],
+                    't': preds_dict["t"],
+                    'exp': preds_dict["exp"],
+                    'scale': preds_dict["scale"],
+                    'kp': preds_dict["kp"]
+                }
 
-            torch.cuda.synchronize()
-            motion_extractor_model.run_with_iobinding(io_binding)
+                nvtx.range_pop()
 
-            kp_info = {
-                'pitch': pitch,
-                'yaw': yaw,
-                'roll': roll,
-                't': t,
-                'exp': exp,
-                'scale': scale,
-                'kp': kp
-            }
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_motion_extractor_model:
+                        self.lp_motion_extractor_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/motion_extractor.onnx", providers=self.providers)
 
-        flag_refine_info: bool = kwargs.get('flag_refine_info', True)
-        if flag_refine_info:
-            bs = kp_info['kp'].shape[0]
-            kp_info['pitch'] = faceutil.headpose_pred_to_degree(kp_info['pitch'])[:, None]  # Bx1
-            kp_info['yaw'] = faceutil.headpose_pred_to_degree(kp_info['yaw'])[:, None]  # Bx1
-            kp_info['roll'] = faceutil.headpose_pred_to_degree(kp_info['roll'])[:, None]  # Bx1
-            kp_info['kp'] = kp_info['kp'].reshape(bs, -1, 3)  # BxNx3
-            kp_info['exp'] = kp_info['exp'].reshape(bs, -1, 3)  # BxNx3
+                    motion_extractor_model = self.lp_motion_extractor_model
+
+                # prepare_source
+                I_s = torch.div(img.type(torch.float32), 255.)
+                I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
+                I_s = torch.unsqueeze(I_s, 0).contiguous()
+
+                pitch = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
+                yaw = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
+                roll = torch.empty((1,66), dtype=torch.float32, device='cuda').contiguous()
+                t = torch.empty((1,3), dtype=torch.float32, device='cuda').contiguous()
+                exp = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+                scale = torch.empty((1,1), dtype=torch.float32, device='cuda').contiguous()
+                kp = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+
+                io_binding = motion_extractor_model.io_binding()
+                io_binding.bind_input(name='img', device_type='cuda', device_id=0, element_type=np.float32, shape=I_s.size(), buffer_ptr=I_s.data_ptr())
+                io_binding.bind_output(name='pitch', device_type='cuda', device_id=0, element_type=np.float32, shape=pitch.size(), buffer_ptr=pitch.data_ptr())
+                io_binding.bind_output(name='yaw', device_type='cuda', device_id=0, element_type=np.float32, shape=yaw.size(), buffer_ptr=yaw.data_ptr())
+                io_binding.bind_output(name='roll', device_type='cuda', device_id=0, element_type=np.float32, shape=roll.size(), buffer_ptr=roll.data_ptr())
+                io_binding.bind_output(name='t', device_type='cuda', device_id=0, element_type=np.float32, shape=t.size(), buffer_ptr=t.data_ptr())
+                io_binding.bind_output(name='exp', device_type='cuda', device_id=0, element_type=np.float32, shape=exp.size(), buffer_ptr=exp.data_ptr())
+                io_binding.bind_output(name='scale', device_type='cuda', device_id=0, element_type=np.float32, shape=scale.size(), buffer_ptr=scale.data_ptr())
+                io_binding.bind_output(name='kp', device_type='cuda', device_id=0, element_type=np.float32, shape=kp.size(), buffer_ptr=kp.data_ptr())
+
+                torch.cuda.synchronize()
+                motion_extractor_model.run_with_iobinding(io_binding)
+
+                kp_info = {
+                    'pitch': pitch,
+                    'yaw': yaw,
+                    'roll': roll,
+                    't': t,
+                    'exp': exp,
+                    'scale': scale,
+                    'kp': kp
+                }
+
+            flag_refine_info: bool = kwargs.get('flag_refine_info', True)
+            if flag_refine_info:
+                bs = kp_info['kp'].shape[0]
+                kp_info['pitch'] = faceutil.headpose_pred_to_degree(kp_info['pitch'])[:, None]  # Bx1
+                kp_info['yaw'] = faceutil.headpose_pred_to_degree(kp_info['yaw'])[:, None]  # Bx1
+                kp_info['roll'] = faceutil.headpose_pred_to_degree(kp_info['roll'])[:, None]  # Bx1
+                kp_info['kp'] = kp_info['kp'].reshape(bs, -1, 3)  # BxNx3
+                kp_info['exp'] = kp_info['exp'].reshape(bs, -1, 3)  # BxNx3
 
         return kp_info
 
     def lp_appearance_feature_extractor(self, img, face_editor_type='Human-Face'):
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_appearance_feature_extractor_model or not isinstance(self.lp_appearance_feature_extractor_model, TensorRTPredictor):
-                    if not os.path.exists("./models/liveportrait_onnx/appearance_feature_extractor.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/appearance_feature_extractor.onnx",
-                                 trt_model_path=None, precision="fp16",
-                                 verbose=False
-                                )
-                    self.lp_appearance_feature_extractor_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/appearance_feature_extractor.trt", pool_size=self.nThreads)
-
-            appearance_feature_extractor_model = self.lp_appearance_feature_extractor_model
-
-            # prepare_source
-            I_s = torch.div(img.type(torch.float32), 255.)
-            I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
-            I_s = torch.unsqueeze(I_s, 0).contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["img"] = I_s
-            preds_dict = appearance_feature_extractor_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = appearance_feature_extractor_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            output = preds_dict["output"]
-
-            nvtx.range_pop()
-
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_appearance_feature_extractor_model or isinstance(self.lp_appearance_feature_extractor_model, TensorRTPredictor):
-                    self.lp_appearance_feature_extractor_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/appearance_feature_extractor.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_appearance_feature_extractor_model or not isinstance(self.lp_appearance_feature_extractor_model, TensorRTPredictor):
+                        if not os.path.exists("./models/liveportrait_onnx/appearance_feature_extractor." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/appearance_feature_extractor.onnx",
+                                     trt_model_path=None, precision="fp16",
+                                     verbose=False
+                                    )
+                        self.lp_appearance_feature_extractor_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/appearance_feature_extractor." + trt.__version__ + ".trt", pool_size=self.nThreads)
 
                 appearance_feature_extractor_model = self.lp_appearance_feature_extractor_model
 
-            # prepare_source
-            I_s = torch.div(img.type(torch.float32), 255.)
-            I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
-            I_s = torch.unsqueeze(I_s, 0).contiguous()
+                # prepare_source
+                I_s = torch.div(img.type(torch.float32), 255.)
+                I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
+                I_s = torch.unsqueeze(I_s, 0).contiguous()
 
-            output = torch.empty((1,32,16,64,64), dtype=torch.float32, device='cuda').contiguous()
+                nvtx.range_push("forward")
 
-            io_binding = appearance_feature_extractor_model.io_binding()
-            io_binding.bind_input(name='img', device_type='cuda', device_id=0, element_type=np.float32, shape=I_s.size(), buffer_ptr=I_s.data_ptr())
-            io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=output.size(), buffer_ptr=output.data_ptr())
+                feed_dict = {}
+                feed_dict["img"] = I_s
+                preds_dict = appearance_feature_extractor_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = appearance_feature_extractor_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                output = preds_dict["output"]
 
-            torch.cuda.synchronize()
-            appearance_feature_extractor_model.run_with_iobinding(io_binding)
+                nvtx.range_pop()
+
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_appearance_feature_extractor_model or isinstance(self.lp_appearance_feature_extractor_model, TensorRTPredictor):
+                        self.lp_appearance_feature_extractor_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/appearance_feature_extractor.onnx", providers=self.providers)
+
+                    appearance_feature_extractor_model = self.lp_appearance_feature_extractor_model
+
+                # prepare_source
+                I_s = torch.div(img.type(torch.float32), 255.)
+                I_s = torch.clamp(I_s, 0, 1)  # clamp to 0~1
+                I_s = torch.unsqueeze(I_s, 0).contiguous()
+
+                output = torch.empty((1,32,16,64,64), dtype=torch.float32, device='cuda').contiguous()
+
+                io_binding = appearance_feature_extractor_model.io_binding()
+                io_binding.bind_input(name='img', device_type='cuda', device_id=0, element_type=np.float32, shape=I_s.size(), buffer_ptr=I_s.data_ptr())
+                io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=output.size(), buffer_ptr=output.data_ptr())
+
+                torch.cuda.synchronize()
+                appearance_feature_extractor_model.run_with_iobinding(io_binding)
 
         return output
 
@@ -2740,47 +2742,48 @@ class Models():
         eye_close_ratio: Bx3
         Return: Bx(3*num_kp)
         """
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_eye_model or not isinstance(self.lp_stitching_eye_model, TensorRTPredictor):
-                    if not os.path.exists("./models/liveportrait_onnx/stitching_eye.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching_eye.onnx",
-                                 trt_model_path=None, precision="fp16",
-                                 verbose=False
-                                )
-                    self.lp_stitching_eye_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching_eye.trt", pool_size=self.nThreads)
-
-            stitching_eye_model = self.lp_stitching_eye_model
-
-            feat_eye = faceutil.concat_feat(kp_source, eye_close_ratio).contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["input"] = feat_eye
-            preds_dict = stitching_eye_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = stitching_eye_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            delta = preds_dict["output"]
-
-            nvtx.range_pop()
-
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_eye_model or isinstance(self.lp_stitching_eye_model, TensorRTPredictor):
-                    self.lp_stitching_eye_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching_eye.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_eye_model or not isinstance(self.lp_stitching_eye_model, TensorRTPredictor):
+                        if not os.path.exists("./models/liveportrait_onnx/stitching_eye." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching_eye.onnx",
+                                     trt_model_path=None, precision="fp16",
+                                     verbose=False
+                                    )
+                        self.lp_stitching_eye_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching_eye." + trt.__version__ + ".trt", pool_size=self.nThreads)
 
                 stitching_eye_model = self.lp_stitching_eye_model
 
-            feat_eye = faceutil.concat_feat(kp_source, eye_close_ratio).contiguous()
-            delta = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+                feat_eye = faceutil.concat_feat(kp_source, eye_close_ratio).contiguous()
 
-            io_binding = stitching_eye_model.io_binding()
-            io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_eye.size(), buffer_ptr=feat_eye.data_ptr())
-            io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+                nvtx.range_push("forward")
 
-            torch.cuda.synchronize()
-            stitching_eye_model.run_with_iobinding(io_binding)
+                feed_dict = {}
+                feed_dict["input"] = feat_eye
+                preds_dict = stitching_eye_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = stitching_eye_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                delta = preds_dict["output"]
+
+                nvtx.range_pop()
+
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_eye_model or isinstance(self.lp_stitching_eye_model, TensorRTPredictor):
+                        self.lp_stitching_eye_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching_eye.onnx", providers=self.providers)
+
+                    stitching_eye_model = self.lp_stitching_eye_model
+
+                feat_eye = faceutil.concat_feat(kp_source, eye_close_ratio).contiguous()
+                delta = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+
+                io_binding = stitching_eye_model.io_binding()
+                io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_eye.size(), buffer_ptr=feat_eye.data_ptr())
+                io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+
+                torch.cuda.synchronize()
+                stitching_eye_model.run_with_iobinding(io_binding)
 
         return delta.reshape(-1, kp_source.shape[1], 3)
 
@@ -2790,47 +2793,48 @@ class Models():
         lip_close_ratio: Bx2
         Return: Bx(3*num_kp)
         """
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_lip_model or not isinstance(self.lp_stitching_lip_model, TensorRTPredictor):
-                    if not os.path.exists("./models/liveportrait_onnx/stitching_lip.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching_lip.onnx",
-                                 trt_model_path=None, precision="fp16",
-                                 verbose=False
-                                )
-                    self.lp_stitching_lip_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching_lip.trt", pool_size=self.nThreads)
-
-            stitching_lip_model = self.lp_stitching_lip_model
-
-            feat_lip = faceutil.concat_feat(kp_source, lip_close_ratio).contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["input"] = feat_lip
-            preds_dict = stitching_lip_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = stitching_lip_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            delta = preds_dict["output"]
-
-            nvtx.range_pop()
-
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_lip_model or isinstance(self.lp_stitching_lip_model, TensorRTPredictor):
-                    self.lp_stitching_lip_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching_lip.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_lip_model or not isinstance(self.lp_stitching_lip_model, TensorRTPredictor):
+                        if not os.path.exists("./models/liveportrait_onnx/stitching_lip." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching_lip.onnx",
+                                     trt_model_path=None, precision="fp16",
+                                     verbose=False
+                                    )
+                        self.lp_stitching_lip_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching_lip." + trt.__version__ + ".trt", pool_size=self.nThreads)
 
                 stitching_lip_model = self.lp_stitching_lip_model
 
-            feat_lip = faceutil.concat_feat(kp_source, lip_close_ratio).contiguous()
-            delta = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+                feat_lip = faceutil.concat_feat(kp_source, lip_close_ratio).contiguous()
 
-            io_binding = stitching_lip_model.io_binding()
-            io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_lip.size(), buffer_ptr=feat_lip.data_ptr())
-            io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+                nvtx.range_push("forward")
 
-            torch.cuda.synchronize()
-            stitching_lip_model.run_with_iobinding(io_binding)
+                feed_dict = {}
+                feed_dict["input"] = feat_lip
+                preds_dict = stitching_lip_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = stitching_lip_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                delta = preds_dict["output"]
+
+                nvtx.range_pop()
+
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_lip_model or isinstance(self.lp_stitching_lip_model, TensorRTPredictor):
+                        self.lp_stitching_lip_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching_lip.onnx", providers=self.providers)
+
+                    stitching_lip_model = self.lp_stitching_lip_model
+
+                feat_lip = faceutil.concat_feat(kp_source, lip_close_ratio).contiguous()
+                delta = torch.empty((1,63), dtype=torch.float32, device='cuda').contiguous()
+
+                io_binding = stitching_lip_model.io_binding()
+                io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_lip.size(), buffer_ptr=feat_lip.data_ptr())
+                io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+
+                torch.cuda.synchronize()
+                stitching_lip_model.run_with_iobinding(io_binding)
 
         return delta.reshape(-1, kp_source.shape[1], 3)
 
@@ -2840,47 +2844,48 @@ class Models():
         kp_driving: BxNx3
         Return: Bx(3*num_kp+2)
         """
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_model or not isinstance(self.lp_stitching_model, TensorRTPredictor):
-                    if not os.path.exists("./models/liveportrait_onnx/stitching.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching.onnx",
-                                 trt_model_path=None, precision="fp16",
-                                 verbose=False
-                                )
-                    self.lp_stitching_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching.trt", pool_size=self.nThreads)
-
-            stitching_model = self.lp_stitching_model
-
-            feat_stiching = faceutil.concat_feat(kp_source, kp_driving).contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["input"] = feat_stiching
-            preds_dict = stitching_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = stitching_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            delta = preds_dict["output"]
-
-            nvtx.range_pop()
-
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_stitching_model or isinstance(self.lp_stitching_model, TensorRTPredictor):
-                    self.lp_stitching_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_model or not isinstance(self.lp_stitching_model, TensorRTPredictor):
+                        if not os.path.exists("./models/liveportrait_onnx/stitching." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/stitching.onnx",
+                                     trt_model_path=None, precision="fp16",
+                                     verbose=False
+                                    )
+                        self.lp_stitching_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/stitching." + trt.__version__ + ".trt", pool_size=self.nThreads)
 
                 stitching_model = self.lp_stitching_model
 
-            feat_stiching = faceutil.concat_feat(kp_source, kp_driving).contiguous()
-            delta = torch.empty((1,65), dtype=torch.float32, device='cuda').contiguous()
+                feat_stiching = faceutil.concat_feat(kp_source, kp_driving).contiguous()
 
-            io_binding = stitching_model.io_binding()
-            io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_stiching.size(), buffer_ptr=feat_stiching.data_ptr())
-            io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+                nvtx.range_push("forward")
 
-            torch.cuda.synchronize()
-            stitching_model.run_with_iobinding(io_binding)
+                feed_dict = {}
+                feed_dict["input"] = feat_stiching
+                preds_dict = stitching_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = stitching_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                delta = preds_dict["output"]
+
+                nvtx.range_pop()
+
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_stitching_model or isinstance(self.lp_stitching_model, TensorRTPredictor):
+                        self.lp_stitching_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/stitching.onnx", providers=self.providers)
+
+                    stitching_model = self.lp_stitching_model
+
+                feat_stiching = faceutil.concat_feat(kp_source, kp_driving).contiguous()
+                delta = torch.empty((1,65), dtype=torch.float32, device='cuda').contiguous()
+
+                io_binding = stitching_model.io_binding()
+                io_binding.bind_input(name='input', device_type='cuda', device_id=0, element_type=np.float32, shape=feat_stiching.size(), buffer_ptr=feat_stiching.data_ptr())
+                io_binding.bind_output(name='output', device_type='cuda', device_id=0, element_type=np.float32, shape=delta.size(), buffer_ptr=delta.data_ptr())
+
+                torch.cuda.synchronize()
+                stitching_model.run_with_iobinding(io_binding)
 
         return delta
 
@@ -2910,54 +2915,55 @@ class Models():
         kp_driving: BxNx3
         """
 
-        if self.provider_name == "TensorRT-Engine":
-            if face_editor_type == 'Human-Face':
-                if not self.lp_warping_spade_fix_model or not isinstance(self.lp_warping_spade_fix_model, TensorRTPredictor):
-                    if not os.path.exists("./models/liveportrait_onnx/warping_spade-fix.trt"):
-                        onnx2trt(onnx_model_path="./models/liveportrait_onnx/warping_spade-fix.onnx",
-                                 trt_model_path=None, precision="fp16",
-                                 custom_plugin_path="./models/grid_sample_3d_plugin.dll",
-                                 verbose=False
-                                )
-                    self.lp_warping_spade_fix_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/warping_spade-fix.trt", custom_plugin_path="./models/grid_sample_3d_plugin.dll", pool_size=self.nThreads)
-
-            warping_spade_model = self.lp_warping_spade_fix_model
-
-            feature_3d = feature_3d.contiguous()
-            kp_source = kp_source.contiguous()
-            kp_driving = kp_driving.contiguous()
-
-            nvtx.range_push("forward")
-
-            feed_dict = {}
-            feed_dict["feature_3d"] = feature_3d
-            feed_dict["kp_source"] = kp_source
-            feed_dict["kp_driving"] = kp_driving
-            preds_dict = warping_spade_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
-            #preds_dict = warping_spade_model.predict(feed_dict)
-            torch.cuda.synchronize()
-            out = preds_dict["out"]
-
-            nvtx.range_pop()
-        else:
-            if face_editor_type == 'Human-Face':
-                if not self.lp_warping_spade_fix_model or isinstance(self.lp_warping_spade_fix_model, TensorRTPredictor):
-                    self.lp_warping_spade_fix_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/warping_spade.onnx", providers=self.providers)
+        with torch.no_grad():
+            if self.provider_name == "TensorRT-Engine":
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_warping_spade_fix_model or not isinstance(self.lp_warping_spade_fix_model, TensorRTPredictor):
+                        if not os.path.exists("./models/liveportrait_onnx/warping_spade-fix." + trt.__version__ + ".trt"):
+                            onnx2trt(onnx_model_path="./models/liveportrait_onnx/warping_spade-fix.onnx",
+                                     trt_model_path=None, precision="fp16",
+                                     custom_plugin_path="./models/grid_sample_3d_plugin.dll",
+                                     verbose=False
+                                    )
+                        self.lp_warping_spade_fix_model = TensorRTPredictor(model_path="./models/liveportrait_onnx/warping_spade-fix." + trt.__version__ + ".trt", custom_plugin_path="./models/grid_sample_3d_plugin.dll", pool_size=self.nThreads)
 
                 warping_spade_model = self.lp_warping_spade_fix_model
 
-            feature_3d = feature_3d.contiguous()
-            kp_source = kp_source.contiguous()
-            kp_driving = kp_driving.contiguous()
+                feature_3d = feature_3d.contiguous()
+                kp_source = kp_source.contiguous()
+                kp_driving = kp_driving.contiguous()
 
-            out = torch.empty((1,3,512,512), dtype=torch.float32, device='cuda').contiguous()
-            io_binding = warping_spade_model.io_binding()
-            io_binding.bind_input(name='feature_3d', device_type='cuda', device_id=0, element_type=np.float32, shape=feature_3d.size(), buffer_ptr=feature_3d.data_ptr())
-            io_binding.bind_input(name='kp_driving', device_type='cuda', device_id=0, element_type=np.float32, shape=kp_driving.size(), buffer_ptr=kp_driving.data_ptr())
-            io_binding.bind_input(name='kp_source', device_type='cuda', device_id=0, element_type=np.float32, shape=kp_source.size(), buffer_ptr=kp_source.data_ptr())
-            io_binding.bind_output(name='out', device_type='cuda', device_id=0, element_type=np.float32, shape=out.size(), buffer_ptr=out.data_ptr())
+                nvtx.range_push("forward")
 
-            torch.cuda.synchronize()
-            warping_spade_model.run_with_iobinding(io_binding)
+                feed_dict = {}
+                feed_dict["feature_3d"] = feature_3d
+                feed_dict["kp_source"] = kp_source
+                feed_dict["kp_driving"] = kp_driving
+                preds_dict = warping_spade_model.predict_async(feed_dict, torch.cuda.current_stream().cuda_stream)
+                #preds_dict = warping_spade_model.predict(feed_dict)
+                torch.cuda.synchronize()
+                out = preds_dict["out"]
+
+                nvtx.range_pop()
+            else:
+                if face_editor_type == 'Human-Face':
+                    if not self.lp_warping_spade_fix_model or isinstance(self.lp_warping_spade_fix_model, TensorRTPredictor):
+                        self.lp_warping_spade_fix_model = onnxruntime.InferenceSession("./models/liveportrait_onnx/warping_spade.onnx", providers=self.providers)
+
+                    warping_spade_model = self.lp_warping_spade_fix_model
+
+                feature_3d = feature_3d.contiguous()
+                kp_source = kp_source.contiguous()
+                kp_driving = kp_driving.contiguous()
+
+                out = torch.empty((1,3,512,512), dtype=torch.float32, device='cuda').contiguous()
+                io_binding = warping_spade_model.io_binding()
+                io_binding.bind_input(name='feature_3d', device_type='cuda', device_id=0, element_type=np.float32, shape=feature_3d.size(), buffer_ptr=feature_3d.data_ptr())
+                io_binding.bind_input(name='kp_driving', device_type='cuda', device_id=0, element_type=np.float32, shape=kp_driving.size(), buffer_ptr=kp_driving.data_ptr())
+                io_binding.bind_input(name='kp_source', device_type='cuda', device_id=0, element_type=np.float32, shape=kp_source.size(), buffer_ptr=kp_source.data_ptr())
+                io_binding.bind_output(name='out', device_type='cuda', device_id=0, element_type=np.float32, shape=out.size(), buffer_ptr=out.data_ptr())
+
+                torch.cuda.synchronize()
+                warping_spade_model.run_with_iobinding(io_binding)
 
         return out

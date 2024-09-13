@@ -111,16 +111,27 @@ class EngineBuilder:
             log.info("Serializing engine to file: {:}".format(engine_path))
             f.write(serialized_engine)
 
-def change_extension(file_path, new_extension):
-    # Creare un oggetto Path e cambiare l'estensione
-    new_file_path = Path(file_path).with_suffix(f'.{new_extension.lstrip(".")}')
+def change_extension(file_path, new_extension, version=None):
+    """
+    Change the extension of the file path and optionally prepend a version.
+    """
+    # Remove leading '.' from the new extension if present
+    new_extension = new_extension.lstrip('.')
+    
+    # Create the new file path with the version before the extension, if provided
+    if version:
+        new_file_path = Path(file_path).with_suffix(f'.{version}.{new_extension}')
+    else:
+        new_file_path = Path(file_path).with_suffix(f'.{new_extension}')
+
     return str(new_file_path)
 
 def onnx_to_trt(onnx_model_path, trt_model_path=None, precision="fp16", custom_plugin_path=None, verbose=False):
     # The precision mode to build in, either 'fp32', 'fp16' or 'int8', default: 'fp16'"
 
     if trt_model_path is None:
-        trt_model_path = change_extension(onnx_model_path, "trt")
+        trt_version = trt.__version__
+        trt_model_path = change_extension(onnx_model_path, "trt", version=trt_version)
     builder = EngineBuilder(verbose=verbose, custom_plugin_path=custom_plugin_path)
 
     builder.create_network(onnx_model_path)
